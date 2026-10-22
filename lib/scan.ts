@@ -82,7 +82,7 @@ function buildResult(
 /** Rules + classification on real listings, shared by the n8n and Apify paths. */
 export async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResult> {
   const { unique, duplicatesRemoved } = dedupeByUrl(raw);
-  const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers);
+  const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers, product.brand);
   const provider = aiProvider();
   let aiOk = 0;
   let aiError: string | undefined;
@@ -127,7 +127,7 @@ function explainAiError(raw: string, provider: "claude" | "gemini"): string {
 export async function runDemoScan(product: Product): Promise<ScanResult> {
   const { listings, verdicts } = mockSearch(product);
   const { unique, duplicatesRemoved } = dedupeByUrl(listings);
-  const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers);
+  const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers, product.brand);
   const items: ScanItem[] = await mapLimit(candidates, 6, async (listing) =>
     applyHistory(product, {
       listing,

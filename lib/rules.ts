@@ -1,4 +1,5 @@
 // Deterministic rules applied around the AI step. No model calls here.
+import { brandCore } from "./rulesClassifier";
 import type { Bucket, Decision, Listing, ScanItem } from "./types";
 
 export const QUEUE_THRESHOLD = 0.7;
@@ -19,11 +20,17 @@ export function dedupeByUrl(listings: Listing[]) {
   return { unique, duplicatesRemoved: listings.length - unique.length };
 }
 
-export function splitAuthorised(listings: Listing[], authorisedSellers: string[]) {
+/**
+ * @param brand when given, a seller named after the brand itself (e.g. "DEEMOON", "DEEMOON Store")
+ *              counts as authorised: that is the brand's own storefront.
+ */
+export function splitAuthorised(listings: Listing[], authorisedSellers: string[], brand?: string) {
   const allow = new Set(authorisedSellers.map(norm).filter(Boolean));
+  const own = brand ? brandCore(brand) : "";
+  const isOwn = (seller: string) => own.length >= 3 && brandCore(seller) === own;
   const authorised: Listing[] = [];
   const candidates: Listing[] = [];
-  for (const l of listings) (allow.has(norm(l.seller)) ? authorised : candidates).push(l);
+  for (const l of listings) (allow.has(norm(l.seller)) || isOwn(l.seller) ? authorised : candidates).push(l);
   return { authorised, candidates };
 }
 
