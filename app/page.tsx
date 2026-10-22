@@ -146,7 +146,7 @@ export default function Home() {
             {[
               ["Plate reads “Maison Vella”", "one letter off yours"],
               ["₹2,499", "90% below your price"],
-              ["Uses your photo", "91% match, recoloured"],
+              ["Copied design", "same shape, plate and clasp"],
               ["Unknown seller", "not an authorised boutique"],
             ].map(([a, b], i) => (
               <Reveal key={a} delay={100 * i}>
