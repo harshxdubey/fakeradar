@@ -144,7 +144,7 @@ export default function ScanPage() {
             {(result.marketplaces?.length ? result.marketplaces : ["amazon_in" as Marketplace]).map((m) => market(m).label).join(" + ")} scan ·{" "}
             {new Date(result.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
             {result.mode === "mock" && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Demo data</span>}
-            {result.mode === "live" && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800">Live Amazon.in data</span>}
+            {result.mode === "live" && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800">Live marketplace data</span>}
             {result.classifier === "rules" && (
               <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 normal-case text-slate-600" title="Checks brand spelling, price and title. Add a Claude API key to also compare photos.">
                 Free rule checks · photos not compared
