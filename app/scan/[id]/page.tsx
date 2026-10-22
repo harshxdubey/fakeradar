@@ -45,17 +45,20 @@ export default function ScanPage() {
     const queue = withBucket.filter((x) => x.bucket === "queue").map((x) => x.item);
     const unsure = withBucket.filter((x) => x.bucket === "unsure").map((x) => x.item);
     const hiddenUnrelated = result.items.filter((i) => i.verdict.label === "unrelated").length;
-    const suspected = [...queue, ...unsure].filter(isSuspected).length;
+    // "Suspected" = confident flags only; Unsure listings are counted separately so the cards match the tabs.
+    const suspected = queue.filter(isSuspected).length;
     const confirmed = Object.values(decisions).filter((d) => d === "confirmed").length;
     const avgPrice = (result.product.minPrice + result.product.maxPrice) / 2;
     const counts: Record<Tab, number> = {
-      all: queue.length,
+      all: queue.length + unsure.length,
       counterfeit: queue.filter((i) => i.verdict.label === "counterfeit").length,
       copycat: queue.filter((i) => i.verdict.label === "copycat").length,
       possible_genuine_reseller: queue.filter((i) => i.verdict.label === "possible_genuine_reseller").length,
       unsure: unsure.length,
     };
-    const shown: ScanItem[] = tab === "all" ? queue : tab === "unsure" ? unsure : queue.filter((i) => i.verdict.label === tab);
+    // All = everything left to review: confident flags first, then the ones that need a closer look.
+    const shown: ScanItem[] =
+      tab === "all" ? [...queue, ...unsure] : tab === "unsure" ? unsure : queue.filter((i) => i.verdict.label === tab);
     return { result, queue, unsure, hiddenUnrelated, suspected, confirmed, revenue: suspected * avgPrice * ASSUMED_UNITS_PER_WEEK, counts, shown };
   }, [state, tab]);
 
@@ -117,7 +120,7 @@ export default function ScanPage() {
             {result.classifier === "claude" && <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-accent-ink">Checked by Claude</span>}
             {result.classifier === "gemini" && <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-accent-ink">Checked by Gemini</span>}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">
+          <h1 className="mt-1 line-clamp-2 text-2xl font-bold tracking-tight" title={`${product.brand} · ${product.name}`}>
             {product.brand} · {product.name}
           </h1>
         </div>
@@ -130,7 +133,12 @@ export default function ScanPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Listings scanned" value={String(result.scanned)} />
-        <Stat label="Suspected fakes" value={String(view.suspected)} tone="red" />
+        <Stat
+          label="Suspected fakes"
+          value={String(view.suspected)}
+          tone="red"
+          hint={view.unsure.length ? `+${view.unsure.length} need a closer look (Unsure)` : undefined}
+        />
         <Stat label="Confirmed" value={String(view.confirmed)} />
         <Stat
           label="Revenue at risk / week"

@@ -8,6 +8,18 @@ const STOPWORDS = new Set(["the", "and", "for", "with", "of", "a", "an", "in", "
 const compact = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 
+// Words owners add to a brand that never appear in the marketplace brand field ("DEEMOON Store" → "deemoon").
+const BRAND_SUFFIXES = new Set([
+  "store", "stores", "official", "india", "shop", "brand", "brands", "online", "retail",
+  "pvt", "ltd", "private", "limited", "co", "company", "enterprises", "mart", "the",
+]);
+
+/** The brand as marketplaces show it: the owner's brand without store/company words. */
+export function brandCore(brand: string): string {
+  const core = words(brand).filter((w) => !BRAND_SUFFIXES.has(w)).join("");
+  return core || compact(brand);
+}
+
 function editDistance(a: string, b: string): number {
   if (Math.abs(a.length - b.length) > 2) return 3;
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
@@ -25,16 +37,17 @@ function editDistance(a: string, b: string): number {
 function brandCandidates(listing: Listing): string[] {
   const w = words(listing.title);
   const pairs = w.slice(0, -1).map((x, i) => x + w.at(i + 1));
-  return [listing.brand ? compact(listing.brand) : "", ...w, ...pairs].filter((x) => x.length >= 3);
+  const fromBrandField = listing.brand ? [compact(listing.brand), brandCore(listing.brand)] : [];
+  return [...fromBrandField, ...w, ...pairs].filter((x) => x.length >= 3);
 }
 
 type BrandMatch = { kind: "exact" } | { kind: "lookalike"; seen: string } | { kind: "none" };
 
 function matchBrand(product: Product, listing: Listing): BrandMatch {
-  const brand = compact(product.brand);
+  const brand = brandCore(product.brand);
   if (!brand) return { kind: "none" };
   const candidates = brandCandidates(listing);
-  if (candidates.includes(brand)) return { kind: "exact" };
+  if (candidates.includes(brand) || candidates.includes(compact(product.brand))) return { kind: "exact" };
   const maxDist = brand.length >= 7 ? 2 : brand.length >= 4 ? 1 : 0;
   for (const c of candidates) {
     const d = editDistance(brand, c);
@@ -49,7 +62,8 @@ function nameOverlap(product: Product, listing: Listing) {
   if (!mine.length) return { share: 0, shared: [] as string[] };
   const theirs = new Set(words(listing.title));
   const shared = mine.filter((w) => theirs.has(w));
-  return { share: shared.length / mine.length, shared };
+  // Long names (a pasted Amazon title) shouldn't make overlap look tiny: judge against at most 6 words.
+  return { share: Math.min(1, shared.length / Math.min(mine.length, 6)), shared };
 }
 
 export function classifyWithRules(product: Product, listing: Listing): Verdict {

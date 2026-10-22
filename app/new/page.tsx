@@ -104,12 +104,13 @@ export default function NewProduct() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium">
               Brand name
-              <input className={input} value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. TerraSip" />
+              <input className={input} value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. TerraSip (not “TerraSip Store”)" />
               {err("brand")}
             </label>
             <label className="block text-sm font-medium">
               Product name
               <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bamboo Steel Water Bottle 1L" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Keep it short, e.g. “Checkered Cotton Shirt”, not the full Amazon title.</span>
               {err("name")}
             </label>
           </div>

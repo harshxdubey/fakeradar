@@ -1,5 +1,6 @@
 // Direct Apify connection (no n8n needed). Runs the Amazon scraper in the background;
 // the browser polls /api/scan/poll so no single request hits the hosting time limit.
+import { brandCore } from "./rulesClassifier";
 import type { Listing, PendingScan, Product } from "./types";
 
 const API = "https://api.apify.com/v2";
@@ -22,8 +23,15 @@ async function apify(path: string, init?: RequestInit) {
   return res.json();
 }
 
+/** Core brand + the first 6 words of the product name, so a pasted Amazon title doesn't over-narrow the search. */
 export function searchUrl(product: Product) {
-  const q = encodeURIComponent(`${product.brand} ${product.name}`.trim()).replace(/%20/g, "+");
+  const core = brandCore(product.brand);
+  const nameWords = product.name
+    .replace(/['’]s\b/gi, "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w && w.toLowerCase() !== core)
+    .slice(0, 6);
+  const q = encodeURIComponent([core, ...nameWords].join(" ").trim()).replace(/%20/g, "+");
   return `https://www.amazon.in/s?k=${q}`;
 }
 

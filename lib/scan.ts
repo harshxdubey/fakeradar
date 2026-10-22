@@ -98,8 +98,23 @@ async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResul
   // Report what actually judged the listings, not just which key is configured.
   const classifier = provider && aiOk > 0 ? provider : "rules";
   const result = buildResult(product, raw, "live", classifier, items, duplicatesRemoved, unique.length, authorised);
-  if (provider && aiError) result.aiNote = `${provider === "gemini" ? "Gemini" : "Claude"} failed on ${items.length - aiOk} of ${items.length} listings (${aiError.slice(0, 120)}); those used the free rule checks.`;
+  if (provider && aiError) {
+    const name = provider === "gemini" ? "Gemini" : "Claude";
+    const failed = items.length - aiOk;
+    result.aiNote = `${name} couldn't check ${failed} of ${items.length} listings: ${explainAiError(aiError, provider)} Those listings used the free rule checks instead.`;
+  }
   return result;
+}
+
+/** Turn a raw provider error into one line the owner can act on. */
+function explainAiError(raw: string, provider: "claude" | "gemini"): string {
+  const keyVar = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY / OPENROUTER_API_KEY";
+  if (/api key not valid|invalid.*key|401|403|unauthori[sz]ed|permission/i.test(raw)) {
+    return `the API key was rejected. Update ${keyVar} in Vercel and redeploy.`;
+  }
+  if (/429|quota|rate limit|resource.?exhausted/i.test(raw)) return "the free-tier limit was reached. Try again in a minute.";
+  if (/404|not found|model/i.test(raw)) return `the model name wasn't found. Check ${provider === "gemini" ? "GEMINI_MODEL" : "the model setting"} in Vercel.`;
+  return `the AI service returned an error (${raw.replace(/\s+/g, " ").slice(0, 80)}).`;
 }
 
 export function runDemoScan(product: Product): ScanResult {
