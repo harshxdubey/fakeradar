@@ -5,7 +5,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import clsx from "clsx";
 import { ScanProgress } from "@/components/ScanProgress";
 import { Button, Card } from "@/components/ui";
+import { ProductSettings } from "@/components/ProductSettings";
 import { listProducts, type SavedProduct } from "@/lib/profile";
+import { appStatus, deviceLink, pullWorkspace, type AppStatus } from "@/lib/sync";
 import { resizePhoto, startScan } from "@/lib/startScan";
 import type { Marketplace, Product } from "@/lib/types";
 
@@ -34,7 +36,15 @@ export default function NewProduct() {
   const [saved, setSaved] = useState<SavedProduct[]>([]);
   const [lastRun, setLastRun] = useState<Product | null>(null);
 
-  useEffect(() => setSaved(listProducts().filter((p) => !p.demo)), []);
+  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const refresh = () => setSaved(listProducts().filter((p) => !p.demo));
+    refresh();
+    appStatus().then(setStatus);
+    pullWorkspace().then((pulled) => pulled && refresh());
+  }, []);
 
   async function addPhotos(files: FileList | null) {
     if (!files?.length) return;
@@ -117,12 +127,33 @@ export default function NewProduct() {
         We use this as the reference to tell your real product apart from fakes and copycats.
       </p>
 
+      {status && !status.db && (
+        <p className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+          Saved in this browser only. Add the free database (Vercel → Storage → Neon) for daily scans, alerts and access from any device.
+        </p>
+      )}
+      {status?.db && (
+        <p className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+          Synced to your workspace. To open it on another device, use your private link:
+          <button
+            className="font-semibold text-accent hover:underline"
+            onClick={async () => {
+              await navigator.clipboard.writeText(deviceLink()).catch(() => {});
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+          >
+            {copied ? "Copied ✓" : "Copy device link"}
+          </button>
+          <span className="text-slate-400">(anyone with it can see your workspace)</span>
+        </p>
+      )}
       {saved.length > 0 && (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-slate-700">Your products</h2>
           <div className="mt-2 space-y-2">
             {saved.map((p) => (
-              <Card key={p.key} className="flex items-center gap-3 p-3">
+              <Card key={p.key} className="flex flex-wrap items-center gap-3 p-3">
                 {p.photos[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={p.photos[0]} alt="" className="h-12 w-12 shrink-0 rounded-lg border object-cover" />
@@ -153,6 +184,11 @@ export default function NewProduct() {
                 <Button size="sm" onClick={() => run(p)}>
                   Scan again
                 </Button>
+                {status && (
+                  <div className="basis-full border-t border-slate-100 pt-2">
+                    <ProductSettings productKey={p.key} status={status} />
+                  </div>
+                )}
               </Card>
             ))}
           </div>

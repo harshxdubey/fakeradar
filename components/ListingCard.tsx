@@ -52,6 +52,7 @@ export function ListingCard({
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            {item.isNew && <Badge className="bg-accent text-white ring-accent">New</Badge>}
             <Badge className={label.className}>{label.text}</Badge>
             <span className="text-xs text-slate-500">{Math.round(verdict.confidence * 100)}% confidence</span>
             <span className="text-xs text-slate-500">

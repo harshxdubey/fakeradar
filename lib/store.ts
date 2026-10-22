@@ -1,6 +1,7 @@
 "use client";
 // Prototype persistence: scans live in the browser's localStorage (no auth, single brand).
 // This keeps the server stateless, so it works on Vercel's serverless functions.
+import { pushScan } from "./sync";
 import type { Decision, Product, ScanResult, StoredScan } from "./types";
 
 const KEY = (id: string) => `fakeradar:scan:${id}`;
@@ -25,6 +26,7 @@ function safeSet(key: string, value: string) {
 export function saveScan(result: ScanResult, photos: string[]) {
   const stored: StoredScan = { result, decisions: {}, takedowns: {} };
   safeSet(KEY(result.id), JSON.stringify(stored));
+  if (result.mode === "live") pushScan(stored);
   safeSet(`${PHOTOS_KEY}:${result.id}`, JSON.stringify(photos));
 }
 
@@ -42,6 +44,12 @@ export function loadScan(id: string): { stored: StoredScan; photos: string[] } |
 
 export function updateScan(id: string, stored: StoredScan) {
   safeSet(KEY(id), JSON.stringify(stored));
+  if (stored.result.mode === "live") pushScan(stored);
+}
+
+/** Keep a scan fetched from the server (another device, or a daily scan) in this browser. */
+export function cacheScan(stored: StoredScan) {
+  safeSet(KEY(stored.result.id), JSON.stringify(stored));
 }
 
 export function withDecision(stored: StoredScan, listingId: string, decision: Decision): StoredScan {

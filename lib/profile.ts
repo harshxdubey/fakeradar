@@ -3,8 +3,10 @@
 // genuine, sellers with confirmed fakes, and every confirmed fake followed through to removal.
 import type { Decision, Listing, Product, TakedownStatus, TrackedTakedown } from "./types";
 
-const PRODUCTS = "fakeradar:products";
-const TAKEDOWNS = "fakeradar:takedowns";
+import { KEYS, pushDeleteProduct, pushDeleteTakedown, pushProduct, pushTakedowns } from "./sync";
+
+const PRODUCTS = KEYS.products;
+const TAKEDOWNS = KEYS.takedowns;
 
 export interface Offender {
   seller: string;
@@ -55,6 +57,7 @@ export function getProduct(key: string): SavedProduct | undefined {
 function putProduct(next: SavedProduct) {
   const all = listProducts().filter((p) => p.key !== next.key);
   write(PRODUCTS, [next, ...all].slice(0, 8)); // photos are stored too; keep well under the ~5 MB browser limit
+  pushProduct(next);
 }
 
 /** Save (or update) a product before a scan; history from earlier scans is kept. */
@@ -82,6 +85,7 @@ export function setLastScan(key: string, scanId: string) {
 
 export function deleteProduct(key: string) {
   write(PRODUCTS, listProducts().filter((p) => p.key !== key));
+  pushDeleteProduct(key);
 }
 
 /** The product as sent to a scan: genuine sellers skipped, history attached. */
@@ -162,8 +166,9 @@ export function listTakedowns(): TrackedTakedown[] {
   return read<TrackedTakedown[]>(TAKEDOWNS, []);
 }
 
-function writeTakedowns(all: TrackedTakedown[]) {
+function writeTakedowns(all: TrackedTakedown[], changed: TrackedTakedown[] = []) {
   write(TAKEDOWNS, all.slice(0, 300));
+  if (changed.length) pushTakedowns(changed);
 }
 
 export function getTakedown(asin: string) {
@@ -176,8 +181,7 @@ function trackTakedown(
 ) {
   const all = listTakedowns();
   if (all.some((t) => t.asin === listing.asin)) return;
-  writeTakedowns([
-    {
+  const item: TrackedTakedown = {
       asin: listing.asin,
       url: listing.url,
       title: listing.title,
@@ -187,13 +191,13 @@ function trackTakedown(
       ...ctx,
       status: "confirmed",
       confirmedAt: new Date().toISOString(),
-    },
-    ...all,
-  ]);
+  };
+  writeTakedowns([item, ...all], [item]);
 }
 
 export function updateTakedown(asin: string, patch: Partial<TrackedTakedown>) {
-  writeTakedowns(listTakedowns().map((t) => (t.asin === asin ? { ...t, ...patch } : t)));
+  const all = listTakedowns().map((t) => (t.asin === asin ? { ...t, ...patch } : t));
+  writeTakedowns(all, all.filter((t) => t.asin === asin));
 }
 
 export function setTakedownStatus(asin: string, status: TakedownStatus, note?: string) {
@@ -207,5 +211,7 @@ export function setTakedownStatus(asin: string, status: TakedownStatus, note?: s
 }
 
 export function removeTakedown(asin: string) {
+  if (!listTakedowns().some((t) => t.asin === asin)) return;
   writeTakedowns(listTakedowns().filter((t) => t.asin !== asin));
+  pushDeleteTakedown(asin);
 }

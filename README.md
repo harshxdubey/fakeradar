@@ -29,6 +29,14 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 - **Brand memory** (in this browser): saved products with one-click re-scan, sellers you marked Genuine are skipped next time, sellers with confirmed fakes are flagged as repeat offenders, and a fake you confirmed that is still up is pushed to the top.
 - **Takedown tracker** (`/takedowns`): every confirmed fake from Not reported → Reported → Removed / Still live / Rejected, with dates and a **Re-check** button that visits the listing to see if it is gone.
 
+## Batch 2: database, daily scans, alerts, sellers
+
+- **Database (optional, free)**: Vercel → Storage → Neon. With `DATABASE_URL` set, everything syncs to a private workspace (a random id in the browser; "Copy device link" opens it elsewhere). Tables are created automatically on first use. Without it, the app runs browser-only as before.
+- **Daily scans**: `vercel.json` runs `/api/cron/daily` at 02:30 UTC (08:00 IST). It starts one Apify run per product with daily scans on; Apify calls `/api/cron/finish` when each run ends, which classifies, saves the scan and sends the alert. Both endpoints require `CRON_SECRET`. "Run now" in product settings triggers the same flow for one product.
+- **New listings**: each scan records what it saw, so listings that appear later get a **New** badge and drive the alerts.
+- **Email alerts** (optional): `RESEND_API_KEY` (resend.com, free). Without a verified domain Resend only delivers to your Resend account email.
+- **Seller view**: a Sellers tab ranks flagged sellers by a 0–100 risk score (strongest flag + extra flagged listings + earlier confirmed fakes) and marks repeat offenders.
+
 ## Environment variables
 
 | Var | Default | Purpose |
@@ -40,6 +48,10 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 | `N8N_WEBHOOK_URL` | – | Optional alternative data source; takes priority over `APIFY_TOKEN`. |
 | `ANTHROPIC_API_KEY` | – | Optional. Set it to classify with Claude (compares photos). Empty = **free rule checks**. |
 | `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Model for both Claude calls. |
+| `DATABASE_URL` | – | Set automatically by Vercel's Neon integration. Enables sync, daily scans and alerts. |
+| `CRON_SECRET` | – | Random string protecting the cron and Apify-callback endpoints. |
+| `RESEND_API_KEY` | – | Optional email alerts. |
+| `ALERT_FROM_EMAIL` | `FakeRadar <onboarding@resend.dev>` | Sender, once you verify a domain in Resend. |
 | `OPENROUTER_API_KEY` | – | Optional. Reach Claude through OpenRouter instead (used only when `ANTHROPIC_API_KEY` is empty). |
 | `OPENROUTER_MODEL` | `anthropic/claude-sonnet-5.5` | OpenRouter model slug — copy the exact one from openrouter.ai/models. |
 | `GEMINI_API_KEY` | – | Optional, **free tier** (aistudio.google.com). Used when neither Claude key is set. Same prompts, photos included. |

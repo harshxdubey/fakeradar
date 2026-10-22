@@ -6,6 +6,7 @@ import { TRACK } from "@/components/ListingCard";
 import { Badge, Button, Card, Spinner } from "@/components/ui";
 import { inr } from "@/lib/format";
 import { listTakedowns, removeTakedown, setTakedownStatus } from "@/lib/profile";
+import { pullWorkspace } from "@/lib/sync";
 import type { RecheckResult, TakedownStatus, TrackedTakedown } from "@/lib/types";
 
 type Filter = "all" | TakedownStatus;
@@ -28,7 +29,10 @@ export default function Takedowns() {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => setItems(listTakedowns());
-  useEffect(refresh, []);
+  useEffect(() => {
+    refresh();
+    pullWorkspace().then((pulled) => pulled && refresh());
+  }, []);
 
   const stats = useMemo(() => {
     const all = items ?? [];

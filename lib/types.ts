@@ -49,6 +49,8 @@ export interface ScanItem {
   verdict: Verdict;
   /** 0–1 similarity between the listing photo and the closest authorised photo. */
   photoMatch?: number;
+  /** First time this listing has been seen for this product (needs the database). */
+  isNew?: boolean;
 }
 
 export interface ScanResult {
@@ -59,6 +61,8 @@ export interface ScanResult {
   classifier: "demo" | "claude" | "gemini" | "rules";
   /** Set when the AI provider failed on some listings and the free rules filled in. */
   aiNote?: string;
+  /** Listings never seen in an earlier scan of this product (undefined = first scan or no database). */
+  newCount?: number;
   product: Product;
   /** Unique listings found (after dedupe). */
   scanned: number;

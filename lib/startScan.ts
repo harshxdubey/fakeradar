@@ -2,6 +2,7 @@
 import { hashPhotos } from "./imageHash.client";
 import { saveProduct, setLastScan, withHistory } from "./profile";
 import { saveScan } from "./store";
+import { workspaceId } from "./sync";
 import type { PendingScan, Product, ScanResult } from "./types";
 
 /** Resize an uploaded photo to a JPEG data URL (keeps requests and storage small). */
@@ -58,7 +59,7 @@ export async function startScan(input: Product, minMs: number, opts: { demo?: bo
     if (Date.now() - started > MAX_WAIT_MS) throw new Error("The Amazon.in search is taking too long. Please try again.");
     await sleep(POLL_MS);
     // Photos ride along so an AI checker can compare them when the scraper finishes.
-    json = await post("/api/scan/poll", { product, pending: json.pending });
+    json = await post("/api/scan/poll", { product, pending: json.pending, ws: workspaceId() });
   }
   if (!json.result) throw new Error(json.error || "Scan returned no result");
   const wait = minMs - (Date.now() - started);

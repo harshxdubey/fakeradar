@@ -5,14 +5,16 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { ListingCard } from "@/components/ListingCard";
 import { TakedownPanel } from "@/components/TakedownPanel";
-import { Button, Card, Spinner } from "@/components/ui";
+import { Badge, Button, Card, Spinner } from "@/components/ui";
 import { inr } from "@/lib/format";
 import { ASSUMED_UNITS_PER_WEEK, bucketFor, isSuspected } from "@/lib/rules";
-import { forgetGenuine, getTakedown, recordDecision } from "@/lib/profile";
-import { loadScan, updateScan, withDecision } from "@/lib/store";
+import { forgetGenuine, getProduct, getTakedown, productKey, recordDecision } from "@/lib/profile";
+import { fetchScan } from "@/lib/sync";
+import { SellerView, summariseSellers } from "@/components/SellerView";
+import { cacheScan, loadScan, updateScan, withDecision } from "@/lib/store";
 import type { Decision, ScanItem, StoredScan, VerdictLabel } from "@/lib/types";
 
-type Tab = "all" | Exclude<VerdictLabel, "unrelated"> | "unsure";
+type Tab = "all" | Exclude<VerdictLabel, "unrelated"> | "unsure" | "sellers";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "all", label: "All" },
@@ -20,6 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "copycat", label: "Copycat" },
   { id: "possible_genuine_reseller", label: "Possible reseller" },
   { id: "unsure", label: "Unsure" },
+  { id: "sellers", label: "Sellers" },
 ];
 
 export default function ScanPage() {
@@ -28,10 +31,17 @@ export default function ScanPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [panelFor, setPanelFor] = useState<string | null>(null);
   const [, setTrackTick] = useState(0);
+  const [sellerFilter, setSellerFilter] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: StoredScan; onUndo?: () => void } | null>(null);
 
   useEffect(() => {
-    setState(loadScan(id));
+    const local = loadScan(id);
+    if (local) return setState(local);
+    // Not in this browser: another device or a daily scan. Fetch it by its link if there's a database.
+    fetchScan(id).then((stored) => {
+      if (stored) cacheScan(stored);
+      setState(stored ? { stored, photos: getProduct(productKey(stored.result.product))?.photos ?? [] } : null);
+    });
   }, [id]);
 
   useEffect(() => {
@@ -51,7 +61,9 @@ export default function ScanPage() {
     const suspected = queue.filter(isSuspected).length;
     const confirmed = Object.values(decisions).filter((d) => d === "confirmed").length;
     const avgPrice = (result.product.minPrice + result.product.maxPrice) / 2;
+    const sellers = summariseSellers([...queue, ...unsure], getProduct(productKey(result.product))?.offenders);
     const counts: Record<Tab, number> = {
+      sellers: sellers.length,
       all: queue.length + unsure.length,
       counterfeit: queue.filter((i) => i.verdict.label === "counterfeit").length,
       copycat: queue.filter((i) => i.verdict.label === "copycat").length,
@@ -59,10 +71,12 @@ export default function ScanPage() {
       unsure: unsure.length,
     };
     // All = everything left to review: confident flags first, then the ones that need a closer look.
-    const shown: ScanItem[] =
-      tab === "all" ? [...queue, ...unsure] : tab === "unsure" ? unsure : queue.filter((i) => i.verdict.label === tab);
-    return { result, queue, unsure, hiddenUnrelated, suspected, confirmed, revenue: suspected * avgPrice * ASSUMED_UNITS_PER_WEEK, counts, shown };
-  }, [state, tab]);
+    let shown: ScanItem[] =
+      tab === "all" || tab === "sellers" ? [...queue, ...unsure] : tab === "unsure" ? unsure : queue.filter((i) => i.verdict.label === tab);
+    if (sellerFilter) shown = shown.filter((i) => i.listing.seller === sellerFilter);
+    const newCount = result.items.filter((i) => i.isNew && bucketFor(i, decisions[i.listing.id]) !== "hidden").length;
+    return { result, queue, unsure, hiddenUnrelated, suspected, confirmed, revenue: suspected * avgPrice * ASSUMED_UNITS_PER_WEEK, counts, shown, sellers, newCount };
+  }, [state, tab, sellerFilter]);
 
   if (state === undefined) {
     return (
@@ -77,7 +91,7 @@ export default function ScanPage() {
       <div className="mx-auto max-w-md px-4 py-24 text-center">
         <h1 className="text-xl font-semibold">Scan not found</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Scans are saved in this browser only. It may have been cleared, or opened on a different device.
+          This scan isn’t in this browser. Open it on the device that ran it, or use your workspace link from the Add product page.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <Link href="/new"><Button>Start a new scan</Button></Link>
@@ -170,7 +184,10 @@ export default function ScanPage() {
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              setTab(t.id);
+              setSellerFilter(null);
+            }}
             className={clsx(
               "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium",
               tab === t.id ? "border-accent text-accent-ink" : "border-transparent text-slate-500 hover:text-slate-800",
@@ -184,8 +201,27 @@ export default function ScanPage() {
         ))}
       </div>
 
+      {view.newCount > 0 && (
+        <p className="mt-3 text-sm text-slate-700">
+          <Badge className="mr-1.5 bg-accent text-white ring-accent">New</Badge>
+          {view.newCount} listing{view.newCount === 1 ? "" : "s"} appeared since your last scan of this product.
+        </p>
+      )}
+
       <div className="mt-4 space-y-4">
-        {view.shown.length === 0 ? (
+        {sellerFilter && (
+          <div className="flex items-center justify-between rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent-ink">
+            <span>
+              Showing listings from <b>{sellerFilter}</b>
+            </span>
+            <button className="font-semibold hover:underline" onClick={() => setSellerFilter(null)}>
+              {tab === "sellers" ? "← Back to sellers" : "Show all"}
+            </button>
+          </div>
+        )}
+        {tab === "sellers" && !sellerFilter ? (
+          <SellerView sellers={view.sellers} onPick={setSellerFilter} />
+        ) : view.shown.length === 0 ? (
           <Card className="p-10 text-center">
             <p className="text-3xl">{view.queue.length + view.unsure.length === 0 ? "🎉" : "🗂️"}</p>
             <p className="mt-2 font-semibold">

@@ -49,9 +49,19 @@ export function searchUrls(product: Product): string[] {
 /** Kept for callers that want the main query only. */
 export const searchUrl = (product: Product) => searchUrls(product)[0];
 
-export async function startApifyRun(product: Product): Promise<PendingScan> {
+/**
+ * @param webhookUrl optional URL Apify calls when the run ends (used by daily scans, so no one has to poll).
+ */
+export async function startApifyRun(product: Product, webhookUrl?: string): Promise<PendingScan> {
   const urls = searchUrls(product);
-  const json = await apify(`/acts/${ACTOR()}/runs`, {
+  const hooks = webhookUrl
+    ? `?webhooks=${encodeURIComponent(
+        Buffer.from(
+          JSON.stringify([{ eventTypes: ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED", "ACTOR.RUN.TIMED_OUT"], requestUrl: webhookUrl }]),
+        ).toString("base64"),
+      )}`
+    : "";
+  const json = await apify(`/acts/${ACTOR()}/runs${hooks}`, {
     method: "POST",
     body: JSON.stringify({
       categoryOrProductUrls: urls.map((url) => ({ url })),

@@ -3,6 +3,7 @@
 // Classifier: Claude (direct or OpenRouter), else Gemini, else the free rule checks.
 import { getRunListings, getRunStatus, hasApifyToken, startApifyRun } from "./apify";
 import { aiProvider, classifyListing } from "./claude";
+import { dbEnabled, hasSeenBefore, isWorkspace, markSeen } from "./db";
 import { bestMatch } from "./imageHash";
 import { hashImage } from "./imageHash.server";
 import { mockSearch } from "./mock";
@@ -79,7 +80,7 @@ function buildResult(
 }
 
 /** Rules + classification on real listings, shared by the n8n and Apify paths. */
-async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResult> {
+export async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResult> {
   const { unique, duplicatesRemoved } = dedupeByUrl(raw);
   const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers);
   const provider = aiProvider();
@@ -180,9 +181,32 @@ export async function startLiveScan(product: Product): Promise<{ result: ScanRes
 }
 
 /** Checks a background Apify run; returns the finished result once the scraper is done. */
-export async function pollLiveScan(product: Product, pending: PendingScan): Promise<{ result: ScanResult } | { pending: PendingScan }> {
+export async function pollLiveScan(
+  product: Product,
+  pending: PendingScan,
+  ws?: string,
+): Promise<{ result: ScanResult } | { pending: PendingScan }> {
   const status = await getRunStatus(pending.runId);
   if (status === "running") return { pending };
   if (status === "failed") throw new Error("The Amazon.in scraper run failed. Please try the scan again.");
-  return { result: await classifyLive(product, await getRunListings(pending.datasetId)) };
+  const result = await classifyLive(product, await getRunListings(pending.datasetId));
+  if (ws) await tagNewListings(ws, product, result);
+  return { result };
+}
+
+export const productKeyOf = (p: Pick<Product, "brand" | "name">) => `${p.brand.trim().toLowerCase()}|${p.name.trim().toLowerCase()}`;
+
+/** Marks listings never seen in an earlier scan of this product. Best-effort: no database, no tags. */
+export async function tagNewListings(ws: string, product: Product, result: ScanResult) {
+  if (!dbEnabled() || !isWorkspace(ws)) return;
+  try {
+    const key = productKeyOf(product);
+    const scannedBefore = await hasSeenBefore(ws, key);
+    const fresh = await markSeen(ws, key, result.items.map((i) => i.listing.asin));
+    if (!scannedBefore) return; // first scan: everything is "new", which says nothing
+    for (const item of result.items) item.isNew = fresh.has(item.listing.asin);
+    result.newCount = fresh.size;
+  } catch (err) {
+    console.error("[scan] new-listing tagging failed:", (err as Error).message);
+  }
 }
