@@ -134,12 +134,13 @@ export function classifyWithRules(product: Product, listing: Listing, photoMatch
       const differentPhoto = compared && !similarPhoto && share >= 0.75;
       return {
         label: "counterfeit",
-        confidence: differentPhoto ? 0.72 : 0.5,
+        // Still Unsure: one reference photo can't rule out colour variants, so this needs a human look.
+        confidence: differentPhoto ? 0.62 : 0.5,
         seller_risk: differentPhoto ? "high" : "medium",
         evidence: [
           `Uses your brand name "${product.brand}"`,
           `${priceLine} — could just be a discount`,
-          differentPhoto ? `${photoLine} — a genuine listing usually shows your own photo` : photoLine,
+          differentPhoto ? `${photoLine} — could be a colour variant; check before reporting` : photoLine,
         ],
       };
     }
