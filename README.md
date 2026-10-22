@@ -35,6 +35,8 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 | `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Model for both Claude calls. |
 | `OPENROUTER_API_KEY` | – | Optional. Reach Claude through OpenRouter instead (used only when `ANTHROPIC_API_KEY` is empty). |
 | `OPENROUTER_MODEL` | `anthropic/claude-sonnet-5.5` | OpenRouter model slug — copy the exact one from openrouter.ai/models. |
+| `GEMINI_API_KEY` | – | Optional, **free tier** (aistudio.google.com). Used when neither Claude key is set. Same prompts, photos included. |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model name. |
 
 ### Free live mode (no paid services)
 

@@ -1,8 +1,8 @@
 // Server-side scan pipeline: search → rules (dedupe, authorised sellers) → classify → result.
 // Data: demo mock listings, an n8n webhook, or Apify directly (free tier, no n8n needed).
-// Classifier: Claude when ANTHROPIC_API_KEY is set, otherwise the free rule checks.
+// Classifier: Claude (direct or OpenRouter), else Gemini, else the free rule checks.
 import { getRunListings, getRunStatus, hasApifyToken, startApifyRun } from "./apify";
-import { classifyListing, hasApiKey } from "./claude";
+import { aiProvider, classifyListing } from "./claude";
 import { mockSearch } from "./mock";
 import { dedupeByUrl, splitAuthorised } from "./rules";
 import { classifyWithRules } from "./rulesClassifier";
@@ -77,19 +77,19 @@ function buildResult(
 async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResult> {
   const { unique, duplicatesRemoved } = dedupeByUrl(raw);
   const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers);
-  const useClaude = hasApiKey();
+  const provider = aiProvider();
 
   const items: ScanItem[] = await mapLimit(candidates, 4, async (listing) => {
-    if (!useClaude) return { listing, verdict: classifyWithRules(product, listing) };
+    if (!provider) return { listing, verdict: classifyWithRules(product, listing) };
     try {
       return { listing, verdict: await classifyListing(product, listing) };
     } catch {
-      // Claude unavailable for this listing: fall back to the free rules rather than dropping it.
+      // AI unavailable for this listing: fall back to the free rules rather than dropping it.
       return { listing, verdict: classifyWithRules(product, listing) };
     }
   });
 
-  return buildResult(product, raw, "live", useClaude ? "claude" : "rules", items, duplicatesRemoved, unique.length, authorised);
+  return buildResult(product, raw, "live", provider ?? "rules", items, duplicatesRemoved, unique.length, authorised);
 }
 
 export function runDemoScan(product: Product): ScanResult {

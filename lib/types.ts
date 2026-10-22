@@ -48,8 +48,8 @@ export interface ScanResult {
   id: string;
   createdAt: string;
   mode: "mock" | "live";
-  /** Who judged the listings: pre-baked demo verdicts, Claude, or the free rule checks. */
-  classifier: "demo" | "claude" | "rules";
+  /** Who judged the listings: pre-baked demo verdicts, Claude, Gemini, or the free rule checks. */
+  classifier: "demo" | "claude" | "gemini" | "rules";
   product: Product;
   /** Unique listings found (after dedupe). */
   scanned: number;

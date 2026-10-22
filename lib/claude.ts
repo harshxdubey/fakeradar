@@ -8,6 +8,8 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // Check the exact slug at openrouter.ai/models; a wrong one falls back to the free rule checks.
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-5.5";
+// Google AI Studio has a free tier. Check model names at ai.google.dev/gemini-api/docs/models.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 type ImageBlock = {
   type: "image";
@@ -18,7 +20,14 @@ type ImageBlock = {
 type ContentBlock = ImageBlock | { type: "text"; text: string };
 
 export function hasApiKey() {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY);
+  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY);
+}
+
+/** Which AI provider the scan uses: Claude direct, then OpenRouter, then Gemini. */
+export function aiProvider(): "claude" | "gemini" | null {
+  if (process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY) return "claude";
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  return null;
 }
 
 async function loadPrompt(name: string, vars: Record<string, string | number>) {
@@ -63,7 +72,40 @@ async function callOpenRouter(content: ContentBlock[], maxTokens: number): Promi
   return json.choices?.[0]?.message?.content ?? "";
 }
 
+/** Gemini needs images inline, so remote listing photos are downloaded and base64-encoded first. */
+async function geminiImagePart(b: ImageBlock) {
+  if (b.source.type === "base64") return { inline_data: { mime_type: b.source.media_type, data: b.source.data } };
+  const res = await fetch(b.source.url);
+  if (!res.ok) return null;
+  const mime = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
+  if (!/^image\/(jpeg|png|webp|gif)$/.test(mime)) return null;
+  return { inline_data: { mime_type: mime, data: Buffer.from(await res.arrayBuffer()).toString("base64") } };
+}
+
+async function callGemini(content: ContentBlock[], maxTokens: number): Promise<string> {
+  const parts = (
+    await Promise.all(content.map((b) => (b.type === "text" ? { text: b.text } : geminiImagePart(b))))
+  ).filter(Boolean);
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: { maxOutputTokens: maxTokens },
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  return (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+}
+
 async function callClaude(content: ContentBlock[], maxTokens: number): Promise<string> {
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) {
+    return callGemini(content, maxTokens);
+  }
   if (!process.env.ANTHROPIC_API_KEY && process.env.OPENROUTER_API_KEY) return callOpenRouter(content, maxTokens);
   const res = await fetch(API_URL, {
     method: "POST",

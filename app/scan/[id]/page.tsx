@@ -115,6 +115,7 @@ export default function ScanPage() {
               </span>
             )}
             {result.classifier === "claude" && <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-accent-ink">Checked by Claude</span>}
+            {result.classifier === "gemini" && <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-accent-ink">Checked by Gemini</span>}
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">
             {product.brand} · {product.name}
