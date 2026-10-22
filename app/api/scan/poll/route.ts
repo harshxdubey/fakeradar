@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     pending?: PendingScan;
     ws?: string;
   };
-  if (!product || !pending?.runId || !pending?.datasetId) {
+  if (!product || !Array.isArray(pending?.runs) || !pending.runs.length || pending.runs.some((r) => !r.runId || !r.datasetId)) {
     return NextResponse.json({ error: "product and pending run are required" }, { status: 400 });
   }
   try {

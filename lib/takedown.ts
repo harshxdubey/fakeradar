@@ -1,17 +1,20 @@
 // Template takedown draft: used in mock mode and as a fallback if the AI call fails.
 // Uses only stored listing fields + AI evidence, same constraint as the AI prompt.
-import { inr, VIOLATION_TYPE } from "./format";
+import { inr, market, VIOLATION_TYPE } from "./format";
 import type { Listing, Product, Verdict } from "./types";
 
 export const TRADEMARK_PLACEHOLDER = "[TRADEMARK NUMBER]";
 
 export function takedownData(product: Pick<Product, "brand" | "name">, listing: Listing, verdict: Verdict) {
+  const m = market(listing.marketplace);
   return {
+    marketplace: m.label,
+    report_via: m.reportVia,
     brand: product.brand,
     product: product.name,
     trademark_number: TRADEMARK_PLACEHOLDER,
     listing_url: listing.url,
-    asin: listing.asin,
+    [m.idName]: listing.asin,
     seller: listing.seller,
     listing_title: listing.title,
     listing_price: inr(listing.price),
@@ -22,12 +25,14 @@ export function takedownData(product: Pick<Product, "brand" | "name">, listing: 
 
 export function draftTakedownTemplate(product: Pick<Product, "brand" | "name">, listing: Listing, verdict: Verdict) {
   const isCopycat = verdict.label === "copycat";
+  const m = market(listing.marketplace);
   return [
-    `Subject: ${isCopycat ? "Copied design and listing content" : "Counterfeit"} of ${product.brand} ${product.name} — ASIN ${listing.asin}`,
+    `Subject: ${isCopycat ? "Copied design and listing content" : "Counterfeit"} of ${product.brand} ${product.name} on ${m.label} — ${m.idName} ${listing.asin}`,
     "",
     "Listing details",
+    `- Marketplace: ${m.label}`,
     `- URL: ${listing.url}`,
-    `- ASIN: ${listing.asin}`,
+    `- ${m.idName}: ${listing.asin}`,
     `- Seller: ${listing.seller}`,
     `- Price: ${inr(listing.price)}`,
     "",
@@ -42,6 +47,6 @@ export function draftTakedownTemplate(product: Pick<Product, "brand" | "name">, 
     ...verdict.evidence.map((e) => `- ${e}`),
     "",
     "Request",
-    "Please review this listing and remove it from Amazon.in.",
+    `Please review this listing and remove it from ${m.label}.`,
   ].join("\n");
 }

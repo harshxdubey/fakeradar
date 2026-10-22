@@ -188,6 +188,7 @@ function trackTakedown(
       seller: listing.seller,
       price: listing.price,
       imageUrl: listing.imageUrl,
+      marketplace: listing.marketplace ?? "amazon_in",
       ...ctx,
       status: "confirmed",
       confirmedAt: new Date().toISOString(),

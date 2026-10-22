@@ -37,6 +37,13 @@ export function ensureSchema(): Promise<void> {
     await q`CREATE TABLE IF NOT EXISTS cron_runs (
       run_id text PRIMARY KEY, ws text NOT NULL, product_key text NOT NULL,
       dataset_id text NOT NULL, started_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz)`;
+    // One daily scan = a group of runs (one per marketplace), processed once all of them have ended.
+    await q`ALTER TABLE cron_runs ADD COLUMN IF NOT EXISTS group_id text`;
+    await q`ALTER TABLE cron_runs ADD COLUMN IF NOT EXISTS marketplace text NOT NULL DEFAULT 'amazon_in'`;
+    await q`ALTER TABLE cron_runs ADD COLUMN IF NOT EXISTS failed boolean NOT NULL DEFAULT false`;
+    await q`CREATE TABLE IF NOT EXISTS cron_groups (
+      group_id text PRIMARY KEY, ws text NOT NULL, product_key text NOT NULL,
+      processed boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now())`;
   })().catch((err) => {
     schema = null;
     throw err;
@@ -168,16 +175,49 @@ export async function hasSeenBefore(ws: string, productKey: string): Promise<boo
 
 // ---- daily-scan runs ----
 
-export async function recordCronRun(runId: string, ws: string, productKey: string, datasetId: string) {
-  await ensureSchema();
-  await sql()`INSERT INTO cron_runs (run_id, ws, product_key, dataset_id) VALUES (${runId}, ${ws}, ${productKey}, ${datasetId})
-    ON CONFLICT DO NOTHING`;
+export interface GroupRun {
+  runId: string;
+  datasetId: string;
+  marketplace: string;
+  failed: boolean;
 }
 
-/** Claims a finished run exactly once (Apify can deliver a webhook more than once). */
-export async function claimCronRun(runId: string): Promise<{ ws: string; productKey: string; datasetId: string } | null> {
+export async function recordCronGroup(groupId: string, ws: string, productKey: string, runs: { runId: string; datasetId: string; marketplace: string }[]) {
   await ensureSchema();
-  const rows = await sql()`UPDATE cron_runs SET finished_at = now() WHERE run_id = ${runId} AND finished_at IS NULL
-    RETURNING ws, product_key, dataset_id`;
-  return rows[0] ? { ws: rows[0].ws as string, productKey: rows[0].product_key as string, datasetId: rows[0].dataset_id as string } : null;
+  const q = sql();
+  await q`INSERT INTO cron_groups (group_id, ws, product_key) VALUES (${groupId}, ${ws}, ${productKey}) ON CONFLICT DO NOTHING`;
+  for (const r of runs) {
+    await q`INSERT INTO cron_runs (run_id, ws, product_key, dataset_id, group_id, marketplace)
+      VALUES (${r.runId}, ${ws}, ${productKey}, ${r.datasetId}, ${groupId}, ${r.marketplace}) ON CONFLICT DO NOTHING`;
+  }
+}
+
+/** Marks one run as ended (once — Apify can deliver a webhook twice); returns its group. */
+export async function finishCronRun(runId: string, failed: boolean): Promise<string | null> {
+  await ensureSchema();
+  const rows = await sql()`UPDATE cron_runs SET finished_at = now(), failed = ${failed}
+    WHERE run_id = ${runId} AND finished_at IS NULL RETURNING COALESCE(group_id, run_id) AS group_id`;
+  return rows[0] ? (rows[0].group_id as string) : null;
+}
+
+/** When every run of a group has ended, claims the group exactly once and returns its runs. */
+export async function claimGroupIfDone(groupId: string): Promise<{ ws: string; productKey: string; runs: GroupRun[] } | null> {
+  await ensureSchema();
+  const q = sql();
+  const open = await q`SELECT 1 FROM cron_runs WHERE COALESCE(group_id, run_id) = ${groupId} AND finished_at IS NULL LIMIT 1`;
+  if (open.length) return null;
+  const claimed = await q`UPDATE cron_groups SET processed = true WHERE group_id = ${groupId} AND processed = false
+    RETURNING ws, product_key`;
+  if (!claimed[0]) return null;
+  const runs = await q`SELECT run_id, dataset_id, marketplace, failed FROM cron_runs WHERE group_id = ${groupId}`;
+  return {
+    ws: claimed[0].ws as string,
+    productKey: claimed[0].product_key as string,
+    runs: runs.map((r) => ({
+      runId: r.run_id as string,
+      datasetId: r.dataset_id as string,
+      marketplace: r.marketplace as string,
+      failed: Boolean(r.failed),
+    })),
+  };
 }

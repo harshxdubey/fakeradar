@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { openEvidenceSheet } from "@/lib/evidence";
 import { getTakedown, setTakedownStatus } from "@/lib/profile";
-import { inr, VIOLATION_TYPE } from "@/lib/format";
+import { inr, market, VIOLATION_TYPE } from "@/lib/format";
 import { TRADEMARK_PLACEHOLDER } from "@/lib/takedown";
 import type { Product, ScanItem } from "@/lib/types";
 import { Button, Spinner } from "./ui";
@@ -98,14 +98,14 @@ export function TakedownPanel({
 
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <b>FakeRadar never files for you</b> — review and submit it yourself on Amazon’s{" "}
-            <i>Report a Violation</i> form.
+            <b>FakeRadar never files for you</b> — review and submit it yourself via {market(listing.marketplace).reportVia}.
           </div>
 
           <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-sm">
             <dt className="text-slate-500">Listing URL</dt>
             <dd className="break-all"><a className="text-accent hover:underline" href={listing.url} target="_blank" rel="noreferrer">{listing.url}</a></dd>
-            <dt className="text-slate-500">ASIN</dt><dd className="font-mono">{listing.asin}</dd>
+            <dt className="text-slate-500">Marketplace</dt><dd>{market(listing.marketplace).label}</dd>
+            <dt className="text-slate-500">{market(listing.marketplace).idName}</dt><dd className="font-mono">{listing.asin}</dd>
             <dt className="text-slate-500">Seller</dt><dd>{listing.seller}</dd>
             <dt className="text-slate-500">Price</dt><dd>{inr(listing.price)}</dd>
             <dt className="text-slate-500">Violation</dt><dd>{VIOLATION_TYPE[verdict.label]}</dd>
@@ -150,7 +150,7 @@ export function TakedownPanel({
             Download evidence (PDF)
           </Button>
           {tracked && tracked.status === "confirmed" ? (
-            <Button variant="success" onClick={markReported} title="Click after you submit the report on Amazon">
+            <Button variant="success" onClick={markReported} title={`Click after you submit the report on ${market(listing.marketplace).label}`}>
               I've reported it ✓
             </Button>
           ) : tracked ? (

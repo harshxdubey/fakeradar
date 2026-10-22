@@ -6,13 +6,13 @@ import clsx from "clsx";
 import { ListingCard } from "@/components/ListingCard";
 import { TakedownPanel } from "@/components/TakedownPanel";
 import { Badge, Button, Card, Spinner } from "@/components/ui";
-import { inr } from "@/lib/format";
+import { inr, market } from "@/lib/format";
 import { ASSUMED_UNITS_PER_WEEK, bucketFor, isSuspected } from "@/lib/rules";
 import { forgetGenuine, getProduct, getTakedown, productKey, recordDecision } from "@/lib/profile";
 import { fetchScan } from "@/lib/sync";
 import { SellerView, summariseSellers } from "@/components/SellerView";
 import { cacheScan, loadScan, updateScan, withDecision } from "@/lib/store";
-import type { Decision, ScanItem, StoredScan, VerdictLabel } from "@/lib/types";
+import type { Decision, Marketplace, ScanItem, StoredScan, VerdictLabel } from "@/lib/types";
 
 type Tab = "all" | Exclude<VerdictLabel, "unrelated"> | "unsure" | "sellers";
 
@@ -32,6 +32,7 @@ export default function ScanPage() {
   const [panelFor, setPanelFor] = useState<string | null>(null);
   const [, setTrackTick] = useState(0);
   const [sellerFilter, setSellerFilter] = useState<string | null>(null);
+  const [marketFilter, setMarketFilter] = useState<Marketplace | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: StoredScan; onUndo?: () => void } | null>(null);
 
   useEffect(() => {
@@ -74,9 +75,16 @@ export default function ScanPage() {
     let shown: ScanItem[] =
       tab === "all" || tab === "sellers" ? [...queue, ...unsure] : tab === "unsure" ? unsure : queue.filter((i) => i.verdict.label === tab);
     if (sellerFilter) shown = shown.filter((i) => i.listing.seller === sellerFilter);
+    if (marketFilter) shown = shown.filter((i) => (i.listing.marketplace ?? "amazon_in") === marketFilter);
+    // Per-marketplace counts of everything left to review, for the filter chips.
+    const byMarket = new Map<Marketplace, number>();
+    for (const i of [...queue, ...unsure]) {
+      const m = i.listing.marketplace ?? "amazon_in";
+      byMarket.set(m, (byMarket.get(m) ?? 0) + 1);
+    }
     const newCount = result.items.filter((i) => i.isNew && bucketFor(i, decisions[i.listing.id]) !== "hidden").length;
-    return { result, queue, unsure, hiddenUnrelated, suspected, confirmed, revenue: suspected * avgPrice * ASSUMED_UNITS_PER_WEEK, counts, shown, sellers, newCount };
-  }, [state, tab, sellerFilter]);
+    return { result, queue, unsure, hiddenUnrelated, suspected, confirmed, revenue: suspected * avgPrice * ASSUMED_UNITS_PER_WEEK, counts, shown, sellers, newCount, byMarket };
+  }, [state, tab, sellerFilter, marketFilter]);
 
   if (state === undefined) {
     return (
@@ -133,7 +141,8 @@ export default function ScanPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Amazon.in scan · {new Date(result.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+            {(result.marketplaces?.length ? result.marketplaces : ["amazon_in" as Marketplace]).map((m) => market(m).label).join(" + ")} scan ·{" "}
+            {new Date(result.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
             {result.mode === "mock" && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Demo data</span>}
             {result.mode === "live" && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800">Live Amazon.in data</span>}
             {result.classifier === "rules" && (
@@ -151,6 +160,9 @@ export default function ScanPage() {
         <Link href="/new"><Button variant="outline" size="sm">Scan another product</Button></Link>
       </div>
 
+      {result.marketNotes?.map((note) => (
+        <p key={note} className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{note}</p>
+      ))}
       {result.aiNote && (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{result.aiNote}</p>
       )}
@@ -209,6 +221,23 @@ export default function ScanPage() {
       )}
 
       <div className="mt-4 space-y-4">
+        {view.byMarket.size > 1 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-xs font-medium text-slate-500">Marketplace:</span>
+            {[null, ...view.byMarket.keys()].map((m) => (
+              <button
+                key={m ?? "all"}
+                onClick={() => setMarketFilter(m)}
+                className={clsx(
+                  "rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset",
+                  marketFilter === m ? "bg-accent text-white ring-accent" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50",
+                )}
+              >
+                {m ? `${market(m).label} · ${view.byMarket.get(m)}` : "All"}
+              </button>
+            ))}
+          </div>
+        )}
         {sellerFilter && (
           <div className="flex items-center justify-between rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent-ink">
             <span>

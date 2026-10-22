@@ -1,6 +1,6 @@
 "use client";
 // "Download evidence": opens a print-ready evidence sheet; the browser's Save as PDF does the rest.
-import { inr, LABELS, VIOLATION_TYPE } from "./format";
+import { inr, LABELS, market, VIOLATION_TYPE } from "./format";
 import type { Product, ScanItem } from "./types";
 
 const esc = (s: string) =>
@@ -31,7 +31,8 @@ export function openEvidenceSheet(product: Product, ownerPhoto: string | undefin
 </div>
 <table>
   <tr><td>Listing URL</td><td>${esc(listing.url)}</td></tr>
-  <tr><td>ASIN</td><td>${esc(listing.asin)}</td></tr>
+  <tr><td>Marketplace</td><td>${esc(market(listing.marketplace).label)}</td></tr>
+  <tr><td>${esc(market(listing.marketplace).idName)}</td><td>${esc(listing.asin)}</td></tr>
   <tr><td>Title</td><td>${esc(listing.title)}</td></tr>
   <tr><td>Seller</td><td>${esc(listing.seller)}</td></tr>
   <tr><td>Price</td><td>${inr(listing.price)} (authorised range ${inr(product.minPrice)}–${inr(product.maxPrice)})</td></tr>

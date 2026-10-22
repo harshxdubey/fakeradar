@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SUPPORTED_MARKETPLACES } from "@/lib/apify";
 import { cleanProduct, isMockMode, runDemoScan, startLiveScan } from "@/lib/scan";
 import type { Product } from "@/lib/types";
 
@@ -15,8 +16,9 @@ export async function POST(req: Request) {
   if (!product?.brand?.trim() || !product?.name?.trim()) {
     return NextResponse.json({ error: "Brand and product name are required" }, { status: 400 });
   }
-  if (product.marketplace !== "amazon_in") {
-    return NextResponse.json({ error: "Only Amazon.in is supported in this prototype" }, { status: 400 });
+  const asked = product.marketplaces?.length ? product.marketplaces : [product.marketplace];
+  if (!asked.length || asked.some((m) => !SUPPORTED_MARKETPLACES.includes(m as never))) {
+    return NextResponse.json({ error: "Choose Amazon.in, Flipkart and/or Myntra" }, { status: 400 });
   }
   try {
     // The sample product on the home page always uses demo data, so the demo works in any mode.

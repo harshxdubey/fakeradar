@@ -1,6 +1,6 @@
 "use client";
 import clsx from "clsx";
-import { inr, LABELS, RISK } from "@/lib/format";
+import { inr, LABELS, market, RISK } from "@/lib/format";
 import { PHOTO_SAME, PHOTO_SIMILAR } from "@/lib/imageHash";
 import type { Decision, Product, ScanItem, TakedownStatus } from "@/lib/types";
 import { Badge, Button, Card } from "./ui";
@@ -52,6 +52,7 @@ export function ListingCard({
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            <Badge className={market(listing.marketplace).className}>{market(listing.marketplace).label}</Badge>
             {item.isNew && <Badge className="bg-accent text-white ring-accent">New</Badge>}
             <Badge className={label.className}>{label.text}</Badge>
             <span className="text-xs text-slate-500">{Math.round(verdict.confidence * 100)}% confidence</span>

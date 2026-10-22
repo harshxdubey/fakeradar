@@ -6,14 +6,16 @@ import clsx from "clsx";
 import { ScanProgress } from "@/components/ScanProgress";
 import { Button, Card } from "@/components/ui";
 import { ProductSettings } from "@/components/ProductSettings";
+import { market } from "@/lib/format";
 import { listProducts, type SavedProduct } from "@/lib/profile";
 import { appStatus, deviceLink, pullWorkspace, type AppStatus } from "@/lib/sync";
 import { resizePhoto, startScan } from "@/lib/startScan";
 import type { Marketplace, Product } from "@/lib/types";
 
-const MARKETPLACES: { id: Marketplace; name: string; enabled: boolean }[] = [
+const MARKETPLACES: { id: Marketplace; name: string; enabled: boolean; note?: string }[] = [
   { id: "amazon_in", name: "Amazon.in", enabled: true },
-  { id: "flipkart", name: "Flipkart", enabled: false },
+  { id: "flipkart", name: "Flipkart", enabled: true },
+  { id: "myntra", name: "Myntra", enabled: true, note: "fashion" },
   { id: "meesho", name: "Meesho", enabled: false },
 ];
 
@@ -27,6 +29,7 @@ export default function NewProduct() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [sellers, setSellers] = useState("");
+  const [markets, setMarkets] = useState<Marketplace[]>(["amazon_in", "flipkart"]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -73,7 +76,8 @@ export default function NewProduct() {
       maxPrice: Number(maxPrice),
       photos,
       authorisedSellers: sellers.split(",").map((s) => s.trim()).filter(Boolean),
-      marketplace: "amazon_in",
+      marketplace: markets[0] ?? "amazon_in",
+      marketplaces: markets,
     };
   }
 
@@ -86,6 +90,7 @@ export default function NewProduct() {
     if (!(hi > 0)) e.maxPrice = "Enter a maximum price";
     else if (lo > hi) e.maxPrice = "Max must be at least the min";
     if (!photos.length) e.photos = "Add at least 1 authorised photo";
+    if (!markets.length) e.markets = "Pick at least one marketplace";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -109,6 +114,7 @@ export default function NewProduct() {
     setMaxPrice(String(p.maxPrice || ""));
     setSellers(p.authorisedSellers.join(", "));
     setPhotos(p.photos);
+    setMarkets(p.marketplaces?.length ? p.marketplaces : [p.marketplace || "amazon_in"]);
     setErrors({});
     window.scrollTo({ top: document.getElementById("product-form")?.offsetTop ?? 0, behavior: "smooth" });
   }
@@ -163,6 +169,9 @@ export default function NewProduct() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">
                     {p.brand} · {p.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {(p.marketplaces?.length ? p.marketplaces : [p.marketplace || "amazon_in"]).map((m) => market(m).label).join(" · ")}
                   </p>
                   <p className="text-xs text-slate-500">
                     {p.offenders.length} repeat-offender seller{p.offenders.length === 1 ? "" : "s"} ·{" "}
@@ -263,22 +272,37 @@ export default function NewProduct() {
           </label>
 
           <fieldset>
-            <legend className="text-sm font-medium">Marketplace</legend>
+            <legend className="text-sm font-medium">Marketplaces to search</legend>
             <div className="mt-2 flex flex-wrap gap-2">
-              {MARKETPLACES.map((m) => (
-                <span
-                  key={m.id}
-                  className={clsx(
-                    "rounded-lg border px-3 py-2 text-sm",
-                    m.enabled ? "border-accent bg-accent-soft font-medium text-accent-ink" : "border-slate-200 text-slate-400",
-                  )}
-                >
-                  {m.enabled ? "● " : ""}
-                  {m.name}
-                  {!m.enabled && <span className="ml-1 text-xs">· coming soon</span>}
-                </span>
-              ))}
+              {MARKETPLACES.map((m) => {
+                const on = markets.includes(m.id);
+                return m.enabled ? (
+                  <label
+                    key={m.id}
+                    className={clsx(
+                      "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+                      on ? "border-accent bg-accent-soft font-medium text-accent-ink" : "border-slate-300 text-slate-700 hover:bg-slate-50",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-indigo-600"
+                      checked={on}
+                      onChange={() => setMarkets((ms) => (on ? ms.filter((x) => x !== m.id) : [...ms, m.id]))}
+                    />
+                    {m.name}
+                    {m.note && <span className="text-xs font-normal text-slate-500">· {m.note}</span>}
+                  </label>
+                ) : (
+                  <span key={m.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
+                    {m.name}
+                    <span className="ml-1 text-xs">· coming soon</span>
+                  </span>
+                );
+              })}
             </div>
+            {err("markets")}
+            <span className="mt-1 block text-xs text-slate-500">Each marketplace adds a little Apify cost per scan.</span>
           </fieldset>
 
           <Button type="submit" size="lg" className="w-full" disabled={loadingPhotos}>

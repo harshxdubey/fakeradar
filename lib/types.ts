@@ -1,4 +1,4 @@
-export type Marketplace = "amazon_in" | "flipkart" | "meesho";
+export type Marketplace = "amazon_in" | "flipkart" | "myntra" | "meesho";
 
 export interface Product {
   brand: string;
@@ -8,7 +8,10 @@ export interface Product {
   /** Authorised product photos (data URLs, resized client-side). */
   photos: string[];
   authorisedSellers: string[];
+  /** Kept for older saved data; scans use `marketplaces` when present. */
   marketplace: Marketplace;
+  /** Marketplaces to search, e.g. ["amazon_in", "flipkart", "myntra"]. */
+  marketplaces?: Marketplace[];
   /** 64-bit image fingerprints (hex) of the authorised photos, computed in the browser. */
   photoHashes?: string[];
   /** Brand history sent with each scan, so repeat offenders and re-listed fakes stand out. */
@@ -27,6 +30,8 @@ export interface Listing {
   imageUrl: string;
   /** Brand as shown on the marketplace, when the source provides it. */
   brand?: string;
+  /** Where the listing was found (absent = Amazon.in, for data saved before multi-marketplace). */
+  marketplace?: Marketplace;
 }
 
 export type VerdictLabel =
@@ -63,6 +68,9 @@ export interface ScanResult {
   aiNote?: string;
   /** Listings never seen in an earlier scan of this product (undefined = first scan or no database). */
   newCount?: number;
+  /** Marketplaces searched, and any that failed this time. */
+  marketplaces?: Marketplace[];
+  marketNotes?: string[];
   product: Product;
   /** Unique listings found (after dedupe). */
   scanned: number;
@@ -91,6 +99,7 @@ export interface TrackedTakedown {
   seller: string;
   price: number;
   imageUrl: string;
+  marketplace?: Marketplace;
   productKey: string;
   productLabel: string;
   scanId: string;
@@ -112,8 +121,12 @@ export interface RecheckResult {
 
 export type Bucket = "queue" | "unsure" | "hidden";
 
-/** A live scan still running on Apify; the browser polls until it finishes. */
-export interface PendingScan {
+/** A live scan still running on Apify (one run per marketplace); the browser polls until all finish. */
+export interface PendingRun {
+  marketplace: Marketplace;
   runId: string;
   datasetId: string;
+}
+export interface PendingScan {
+  runs: PendingRun[];
 }

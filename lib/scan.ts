@@ -1,7 +1,7 @@
 // Server-side scan pipeline: search → rules (dedupe, authorised sellers) → classify → result.
 // Data: demo mock listings, an n8n webhook, or Apify directly (free tier, no n8n needed).
 // Classifier: Claude (direct or OpenRouter), else Gemini, else the free rule checks.
-import { getRunListings, getRunStatus, hasApifyToken, startApifyRun } from "./apify";
+import { getRunListings, getRunStatus, hasApifyToken, marketplaceLabel, startRuns, SUPPORTED_MARKETPLACES } from "./apify";
 import { aiProvider, classifyListing } from "./claude";
 import { dbEnabled, hasSeenBefore, isWorkspace, markSeen } from "./db";
 import { bestMatch } from "./imageHash";
@@ -9,7 +9,7 @@ import { hashImage } from "./imageHash.server";
 import { mockSearch } from "./mock";
 import { dedupeByUrl, splitAuthorised } from "./rules";
 import { classifyWithRules } from "./rulesClassifier";
-import type { Listing, PendingScan, Product, ScanItem, ScanResult, Verdict } from "./types";
+import type { Listing, PendingRun, PendingScan, Product, ScanItem, ScanResult, Verdict } from "./types";
 
 export const isMockMode = () => process.env.USE_MOCK_DATA !== "false";
 
@@ -20,6 +20,8 @@ export function cleanProduct(product: Product): Product {
     maxPrice: Number(product.maxPrice) || 0,
     photos: (product.photos || []).slice(0, 3),
     authorisedSellers: (product.authorisedSellers || []).map(String),
+    marketplace: product.marketplace || "amazon_in",
+    marketplaces: product.marketplaces?.filter((m) => SUPPORTED_MARKETPLACES.includes(m as never)).slice(0, 3),
     photoHashes: (product.photoHashes || []).filter((h) => /^[0-9a-f]{16}$/.test(h)).slice(0, 3),
     knownOffenders: (product.knownOffenders || []).slice(0, 200),
     confirmedAsins: (product.confirmedAsins || []).map(String).slice(0, 500),
@@ -176,22 +178,35 @@ function applyHistory(product: Product, item: ScanItem): ScanItem {
 export async function startLiveScan(product: Product): Promise<{ result: ScanResult } | { pending: PendingScan }> {
   const n8n = process.env.N8N_WEBHOOK_URL;
   if (n8n) return { result: await classifyLive(product, await n8nSearch(product, n8n)) };
-  if (hasApifyToken()) return { pending: await startApifyRun(product) };
+  if (hasApifyToken()) return { pending: { runs: await startRuns(product) } };
   throw new Error("Live mode needs APIFY_TOKEN (or N8N_WEBHOOK_URL). Set one in your environment variables.");
 }
 
-/** Checks a background Apify run; returns the finished result once the scraper is done. */
+/** Checks the background runs (one per marketplace); returns the combined result once all are done. */
 export async function pollLiveScan(
   product: Product,
   pending: PendingScan,
   ws?: string,
 ): Promise<{ result: ScanResult } | { pending: PendingScan }> {
-  const status = await getRunStatus(pending.runId);
-  if (status === "running") return { pending };
-  if (status === "failed") throw new Error("The Amazon.in scraper run failed. Please try the scan again.");
-  const result = await classifyLive(product, await getRunListings(pending.datasetId));
+  const statuses = await Promise.all(pending.runs.map((r) => getRunStatus(r.runId)));
+  if (statuses.includes("running")) return { pending };
+  return { result: await finishRuns(product, pending.runs.map((run, i) => ({ ...run, ok: statuses.at(i) === "succeeded" })), ws) };
+}
+
+/**
+ * Combines finished runs into one scan. A marketplace whose search failed is noted on the result
+ * instead of failing the whole scan; only if every marketplace failed is it an error.
+ */
+export async function finishRuns(product: Product, runs: (PendingRun & { ok: boolean })[], ws?: string): Promise<ScanResult> {
+  const ok = runs.filter((r) => r.ok);
+  if (!ok.length) throw new Error("The marketplace searches failed. Please try the scan again.");
+  const lists = await Promise.all(ok.map((r) => getRunListings(r.datasetId, r.marketplace)));
+  const result = await classifyLive(product, lists.flat());
+  result.marketplaces = runs.map((r) => r.marketplace);
+  const failed = runs.filter((r) => !r.ok).map((r) => marketplaceLabel(r.marketplace));
+  if (failed.length) result.marketNotes = [`${failed.join(" and ")} couldn't be searched this time; results show the other marketplaces.`];
   if (ws) await tagNewListings(ws, product, result);
-  return { result };
+  return result;
 }
 
 export const productKeyOf = (p: Pick<Product, "brand" | "name">) => `${p.brand.trim().toLowerCase()}|${p.name.trim().toLowerCase()}`;

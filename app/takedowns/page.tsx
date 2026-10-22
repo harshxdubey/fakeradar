@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { TRACK } from "@/components/ListingCard";
 import { Badge, Button, Card, Spinner } from "@/components/ui";
-import { inr } from "@/lib/format";
+import { inr, market } from "@/lib/format";
 import { listTakedowns, removeTakedown, setTakedownStatus } from "@/lib/profile";
 import { pullWorkspace } from "@/lib/sync";
 import type { RecheckResult, TakedownStatus, TrackedTakedown } from "@/lib/types";
@@ -148,7 +148,7 @@ export default function Takedowns() {
                   {t.title}
                 </a>
                 <p className="mt-0.5 text-sm text-slate-600">
-                  {inr(t.price)} · {t.seller} · <span className="font-mono text-xs">{t.asin}</span>
+                  {market(t.marketplace).label} · {inr(t.price)} · {t.seller} · <span className="font-mono text-xs">{t.asin}</span>
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   Confirmed {day(t.confirmedAt)} · Reported {day(t.reportedAt)}

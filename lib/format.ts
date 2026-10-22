@@ -1,4 +1,4 @@
-import type { SellerRisk, VerdictLabel } from "./types";
+import type { Marketplace, SellerRisk, VerdictLabel } from "./types";
 
 export const inr = (n: number) =>
   "₹" + Math.round(n).toLocaleString("en-IN");
@@ -25,3 +25,27 @@ export const VIOLATION_TYPE: Record<VerdictLabel, string> = {
   possible_genuine_reseller: "Needs verification — possible unauthorised reseller",
   unrelated: "Not applicable",
 };
+
+export const MARKETS: Record<Marketplace, { label: string; idName: string; reportVia: string; className: string }> = {
+  amazon_in: {
+    label: "Amazon.in",
+    idName: "ASIN",
+    reportVia: "Amazon's Report a Violation form (Brand Registry)",
+    className: "bg-orange-50 text-orange-800 ring-orange-200",
+  },
+  flipkart: {
+    label: "Flipkart",
+    idName: "Product ID (PID)",
+    reportVia: "Flipkart's intellectual property / brand protection complaint process",
+    className: "bg-blue-50 text-blue-800 ring-blue-200",
+  },
+  myntra: {
+    label: "Myntra",
+    idName: "Style ID",
+    reportVia: "Myntra's intellectual property grievance process",
+    className: "bg-pink-50 text-pink-800 ring-pink-200",
+  },
+  meesho: { label: "Meesho", idName: "Product ID", reportVia: "Meesho's IP complaint process", className: "bg-purple-50 text-purple-800 ring-purple-200" },
+};
+
+export const market = (m?: Marketplace) => MARKETS[m ?? "amazon_in"] ?? MARKETS.amazon_in;

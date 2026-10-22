@@ -29,6 +29,10 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 - **Brand memory** (in this browser): saved products with one-click re-scan, sellers you marked Genuine are skipped next time, sellers with confirmed fakes are flagged as repeat offenders, and a fake you confirmed that is still up is pushed to the top.
 - **Takedown tracker** (`/takedowns`): every confirmed fake from Not reported → Reported → Removed / Still live / Rejected, with dates and a **Re-check** button that visits the listing to see if it is gone.
 
+## Marketplaces
+
+Amazon.in (`junglee/Amazon-crawler`), Flipkart (`scrapesage/flipkart-scraper`) and Myntra (`khadinakbar/myntra-product-scraper`), chosen per product. A scan starts one Apify run per marketplace and merges the results; if one marketplace fails, the others still show, with a note. Adapters live in `lib/apify.ts`. Meesho is not included: its search results carry no seller or brand. Optional caps: `FLIPKART_MAX_ITEMS` (15), `MYNTRA_MAX_ITEMS` (12).
+
 ## Batch 2: database, daily scans, alerts, sellers
 
 - **Database (optional, free)**: Vercel → Storage → Neon. With `DATABASE_URL` set, everything syncs to a private workspace (a random id in the browser; "Copy device link" opens it elsewhere). Tables are created automatically on first use. Without it, the app runs browser-only as before.

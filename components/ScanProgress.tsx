@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Button, Card, Spinner } from "./ui";
 
-const STEPS = ["Searching Amazon.in…", "Filtering authorised sellers…", "AI comparing photos…"];
+const STEPS = ["Searching marketplaces…", "Filtering authorised sellers…", "Comparing photos and listings…"];
 
 export function ScanProgress({
   durationMs,

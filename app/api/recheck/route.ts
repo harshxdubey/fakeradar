@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
-import { hasApifyToken, recheckListing } from "@/lib/apify";
+import { hasApifyToken, parseProductUrl, recheckListing } from "@/lib/apify";
 import { isMockMode } from "@/lib/scan";
 import type { RecheckResult } from "@/lib/types";
 
 export const maxDuration = 60;
 
-const AMAZON_PRODUCT = /^https:\/\/www\.amazon\.in\/(?:[^/?#]+\/)?dp\/([A-Z0-9]{10})(?:[/?#].*)?$/;
-
 export async function POST(req: Request) {
   const { url, demo } = (await req.json().catch(() => ({}))) as { url?: string; demo?: boolean };
-  const asin = url?.match(AMAZON_PRODUCT)?.[1];
-  if (!url || !asin) return NextResponse.json({ error: "A valid amazon.in product link is required" }, { status: 400 });
+  // Only real Amazon.in / Flipkart / Myntra product links, so the endpoint can't be used to scrape other sites.
+  const parsed = url ? parseProductUrl(url) : null;
+  if (!url || !parsed) {
+    return NextResponse.json({ error: "A valid Amazon.in, Flipkart or Myntra product link is required" }, { status: 400 });
+  }
+  const asin = parsed.id;
 
   // Demo listings don't exist on Amazon: simulate a takedown result so the tracker can be shown end to end.
   if (demo || isMockMode() || !hasApifyToken()) {
@@ -22,7 +24,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    return NextResponse.json({ result: await recheckListing(`https://www.amazon.in/dp/${asin}`) });
+    return NextResponse.json({ result: await recheckListing(url) });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
