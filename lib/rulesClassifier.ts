@@ -106,6 +106,20 @@ export function classifyWithRules(product: Product, listing: Listing, photoMatch
   }
 
   if (brand.kind === "exact") {
+    // Brands sell many products: your brand on a listing that shares little of this product's name
+    // and doesn't use its photo is most likely a different product of yours, not a fake of this one.
+    const sameProduct = share >= 0.75 || similarPhoto;
+    if (!sameProduct) {
+      return {
+        label: "possible_genuine_reseller",
+        confidence: 0.4,
+        seller_risk: "low",
+        evidence: [
+          `Uses your brand "${product.brand}" on what looks like a different product`,
+          `Title shares little with "${product.name}"${compared ? " and the photo differs" : ""} — add that product to FakeRadar to check it properly`,
+        ],
+      };
+    }
     if (pctBelow >= 30) {
       return {
         label: "counterfeit",
@@ -115,8 +129,9 @@ export function classifyWithRules(product: Product, listing: Listing, photoMatch
       };
     }
     if (pctBelow > 0) {
-      // Slightly cheap + a photo that isn't yours is a stronger fake signal than price alone.
-      const differentPhoto = compared && !similarPhoto;
+      // Slightly cheap + a photo that isn't yours is a stronger fake signal than price alone,
+      // but only when the title clearly names this same product.
+      const differentPhoto = compared && !similarPhoto && share >= 0.75;
       return {
         label: "counterfeit",
         confidence: differentPhoto ? 0.72 : 0.5,
