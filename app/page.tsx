@@ -5,12 +5,13 @@ import { useState, type ReactNode } from "react";
 import { Radar } from "@/components/Radar";
 import { Reveal } from "@/components/Reveal";
 import { ScanProgress } from "@/components/ScanProgress";
-import { productShot } from "@/lib/images";
+import { bagShot } from "@/lib/images";
 import { SAMPLE_PRODUCT } from "@/lib/mock";
 import { startScan } from "@/lib/startScan";
 
-const EXAMPLE_FAKE = productShot({ brand: "TerraSlp", tagline: "BAMBOO · STEEL · 1 LITRE", sticker: "70% OFF", background: "#f5f5f7" });
-const EXAMPLE_REAL = productShot({ brand: "TerraSip", tagline: "BAMBOO · STEEL · 1 LITRE", background: "#f5f5f7" });
+// A fictional luxury house, so the example never implies anything about a real brand or its sellers.
+const EXAMPLE_REAL = bagShot({ brand: "Maison Vela" });
+const EXAMPLE_FAKE = bagShot({ brand: "Maison Vella", leather: "#8a5634", flap: "#6b4024", hardware: "#e3c463", sloppy: true, sticker: "90% OFF" });
 
 const icon = (d: ReactNode) => (
   <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -109,7 +110,7 @@ export default function Home() {
       <section className="mt-28 bg-white py-24 md:mt-36 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <Reveal className="text-center">
-            <h2 className="text-balance text-4xl font-semibold tracking-[-0.02em] md:text-6xl">One letter off. 68% cheaper.</h2>
+            <h2 className="text-balance text-4xl font-semibold tracking-[-0.02em] md:text-6xl">One letter off. 90% cheaper.</h2>
             <p className="mt-4 text-xl text-ink-soft md:text-2xl">FakeRadar spots what a quick look misses.</p>
           </Reveal>
 
@@ -117,10 +118,10 @@ export default function Home() {
             <Reveal>
               <figure className="rounded-[28px] bg-canvas p-8 shadow-soft">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={EXAMPLE_REAL} alt="Your authorised product" className="mx-auto aspect-square w-full max-w-sm rounded-2xl" />
+                <img src={EXAMPLE_REAL} alt="Your authorised handbag" className="mx-auto aspect-square w-full max-w-sm rounded-2xl" />
                 <figcaption className="mt-5 text-center">
                   <span className="block text-lg font-semibold">Your product</span>
-                  <span className="text-ink-soft">TerraSip · ₹799</span>
+                  <span className="text-ink-soft">Maison Vela · ₹24,900</span>
                 </figcaption>
               </figure>
             </Reveal>
@@ -132,10 +133,10 @@ export default function Home() {
             <Reveal delay={250}>
               <figure className="relative rounded-[28px] bg-fake-soft p-8 shadow-soft ring-2 ring-fake/30">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={EXAMPLE_FAKE} alt="A fake listing" className="mx-auto aspect-square w-full max-w-sm rounded-2xl" />
+                <img src={EXAMPLE_FAKE} alt="A counterfeit handbag listing" className="mx-auto aspect-square w-full max-w-sm rounded-2xl" />
                 <figcaption className="mt-5 text-center">
-                  <span className="block text-lg font-semibold text-fake">Listing on Amazon.in</span>
-                  <span className="text-ink-soft">TerraSlp · ₹259</span>
+                  <span className="block text-lg font-semibold text-fake">Listing on Myntra</span>
+                  <span className="text-ink-soft">“Maison Vella” · ₹2,499</span>
                 </figcaption>
               </figure>
             </Reveal>
@@ -143,10 +144,10 @@ export default function Home() {
 
           <div className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2">
             {[
-              ["Brand reads “TerraSlp”", "one letter off yours"],
-              ["₹259", "68% below your minimum"],
-              ["Uses your photo", "92% match"],
-              ["Unknown seller", "not on your list"],
+              ["Plate reads “Maison Vella”", "one letter off yours"],
+              ["₹2,499", "90% below your price"],
+              ["Uses your photo", "91% match, recoloured"],
+              ["Unknown seller", "not an authorised boutique"],
             ].map(([a, b], i) => (
               <Reveal key={a} delay={100 * i}>
                 <div className="flex items-center gap-3 rounded-2xl bg-canvas px-5 py-4">

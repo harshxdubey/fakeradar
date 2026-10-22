@@ -45,8 +45,8 @@ export function Radar({
 
       {/* Blips: fakes found */}
       {[
-        { left: "68%", top: "26%", delay: "0s", size: 14, label: "TerraSlp · ₹259" },
-        { left: "27%", top: "68%", delay: "0.8s", size: 11, label: "Copycat · ₹559" },
+        { left: "68%", top: "26%", delay: "0s", size: 14, label: "Maison Vella · ₹2,499" },
+        { left: "27%", top: "68%", delay: "0.8s", size: 11, label: "Copycat · ₹3,990" },
         { left: "74%", top: "70%", delay: "1.6s", size: 9, label: null },
         { left: "30%", top: "33%", delay: "1.2s", size: 8, label: null },
       ].map((b, i) => (

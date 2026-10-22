@@ -61,3 +61,59 @@ export function productShot(spec: ShotSpec): string {
     <g ${filter}>${item}</g>${stickerSvg}</svg>`;
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
+
+export interface BagSpec {
+  brand: string;
+  /** Leather colour; the fake is a shade off. */
+  leather?: string;
+  flap?: string;
+  hardware?: string;
+  /** Uneven stitching and a slightly skewed plate, as on a cheap copy. */
+  sloppy?: boolean;
+  sticker?: string;
+  background?: string;
+}
+
+/** A structured top-handle luxury bag, drawn in SVG (used on the home page comparison). */
+export function bagShot(spec: BagSpec): string {
+  const {
+    brand,
+    leather = "#7a4a2e",
+    flap = "#5e3620",
+    hardware = "#d4af5a",
+    sloppy = false,
+    sticker,
+    background = "#f5f5f7",
+  } = spec;
+  const stitch = sloppy ? "5 9 2 7" : "6 6";
+  const plateTilt = sloppy ? "rotate(-3 200 236)" : "";
+  const sticky = sticker
+    ? `<g transform="rotate(-12 322 92)"><circle cx="322" cy="92" r="46" fill="#e11d48"/>
+       <text x="322" y="99" font-family="Helvetica,Arial,sans-serif" font-weight="800" font-size="17" fill="#fff" text-anchor="middle">${esc(sticker)}</text></g>`
+    : "";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+    <defs>
+      <linearGradient id="leather" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${leather}"/><stop offset="1" stop-color="${flap}"/>
+      </linearGradient>
+      <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f3dc95"/><stop offset="0.5" stop-color="${hardware}"/><stop offset="1" stop-color="#a8812e"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="400" fill="${background}"/>
+    <ellipse cx="200" cy="338" rx="130" ry="12" fill="#000" opacity=".08"/>
+    <path d="M138 138 C138 64 262 64 262 138" fill="none" stroke="${flap}" stroke-width="14" stroke-linecap="round"/>
+    <rect x="126" y="128" width="20" height="18" rx="4" fill="url(#gold)"/>
+    <rect x="254" y="128" width="20" height="18" rx="4" fill="url(#gold)"/>
+    <path d="M86 150 Q86 138 98 138 H302 Q314 138 314 150 L328 314 Q330 330 314 330 H86 Q70 330 72 314 Z" fill="url(#leather)"/>
+    <path d="M96 156 H304 L316 312 H84 Z" fill="none" stroke="#f1d9b5" stroke-opacity=".55" stroke-width="2" stroke-dasharray="${stitch}"/>
+    <path d="M86 150 Q86 138 98 138 H302 Q314 138 314 150 L318 214 Q200 252 82 214 Z" fill="${flap}"/>
+    <path d="M94 154 H306 L310 208 Q200 242 90 208 Z" fill="none" stroke="#f1d9b5" stroke-opacity=".5" stroke-width="2" stroke-dasharray="${stitch}"/>
+    <g transform="${plateTilt}">
+      <rect x="136" y="220" width="128" height="34" rx="6" fill="url(#gold)"/>
+      <text x="200" y="242" font-family="Georgia,'Times New Roman',serif" font-size="13" letter-spacing="2" fill="#4a3412" text-anchor="middle">${esc(brand.toUpperCase())}</text>
+    </g>
+    <circle cx="200" cy="270" r="7" fill="url(#gold)"/>
+    ${sticky}</svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
