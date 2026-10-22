@@ -20,6 +20,8 @@ export interface Listing {
   price: number;
   seller: string;
   imageUrl: string;
+  /** Brand as shown on the marketplace, when the source provides it. */
+  brand?: string;
 }
 
 export type VerdictLabel =
@@ -46,6 +48,8 @@ export interface ScanResult {
   id: string;
   createdAt: string;
   mode: "mock" | "live";
+  /** Who judged the listings: pre-baked demo verdicts, Claude, or the free rule checks. */
+  classifier: "demo" | "claude" | "rules";
   product: Product;
   /** Unique listings found (after dedupe). */
   scanned: number;
@@ -65,3 +69,9 @@ export interface StoredScan {
 }
 
 export type Bucket = "queue" | "unsure" | "hidden";
+
+/** A live scan still running on Apify; the browser polls until it finishes. */
+export interface PendingScan {
+  runId: string;
+  datasetId: string;
+}

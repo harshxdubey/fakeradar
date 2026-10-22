@@ -25,7 +25,7 @@ export default function Home() {
     setError(null);
     setScanning(true);
     try {
-      const id = await startScan(SAMPLE_PRODUCT, 3500);
+      const id = await startScan(SAMPLE_PRODUCT, 3500, { demo: true });
       router.push(`/scan/${id}`);
     } catch (e) {
       setError((e as Error).message);

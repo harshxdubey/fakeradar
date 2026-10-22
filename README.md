@@ -26,18 +26,30 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 
 | Var | Default | Purpose |
 |---|---|---|
-| `USE_MOCK_DATA` | `true` | `true`: built-in mock Amazon.in listings + pre-baked AI verdicts (no keys needed). `false`: live mode. |
-| `ANTHROPIC_API_KEY` | – | Live mode: Claude classification + takedown drafting (server-side only). |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Model for both calls. |
-| `N8N_WEBHOOK_URL` | – | Live mode: n8n webhook that runs the Apify Amazon search. |
+| `USE_MOCK_DATA` | `true` | `true`: built-in mock listings + pre-baked verdicts. `false`: live Amazon.in scans. The home page's sample product always uses demo data. |
+| `APIFY_TOKEN` | – | Live data, **free tier**: FakeRadar runs the Apify Amazon scraper directly (no n8n needed). |
+| `APIFY_ACTOR` | `junglee/Amazon-crawler` | Apify actor used for the Amazon.in search. |
+| `APIFY_MAX_ITEMS` | `15` | Listings fetched per scan (each costs Apify credit). |
+| `N8N_WEBHOOK_URL` | – | Optional alternative data source; takes priority over `APIFY_TOKEN`. |
+| `ANTHROPIC_API_KEY` | – | Optional. Set it to classify with Claude (compares photos). Empty = **free rule checks**. |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Model for both Claude calls. |
+
+### Free live mode (no paid services)
+
+1. Sign up at apify.com (free plan) and copy your API token.
+2. `npx vercel env add APIFY_TOKEN production` (paste the token) and `npx vercel env add USE_MOCK_DATA production` (type `false`).
+3. `npx vercel --prod`.
+
+Scans then use real Amazon.in listings, judged by the free rule checks in `lib/rulesClassifier.ts`: near-miss brand spellings, your brand far below your price, and titles that reuse your product name. Photos are not compared, so name-only copycat matches go to the Unsure tab. Add `ANTHROPIC_API_KEY` later to switch to Claude.
 
 ## How a scan works
 
 ```
-/api/scan
-  search      mock data  OR  POST N8N_WEBHOOK_URL
+/api/scan        (live + Apify: starts a background run; the browser polls /api/scan/poll)
+  search      mock data  OR  POST N8N_WEBHOOK_URL  OR  Apify junglee/Amazon-crawler
   rules       dedupe by URL → drop authorised sellers          (plain code, lib/rules.ts)
-  AI          Claude vision+text per listing → strict JSON      (prompts/classify.md)
+  classify    Claude vision+text per listing → strict JSON      (prompts/classify.md)
+              or, with no ANTHROPIC_API_KEY, free rule checks     (lib/rulesClassifier.ts)
   buckets     confidence ≥0.7 → queue · 0.3–0.7 → Unsure · <0.3 or "unrelated" → hidden
 /api/takedown
   AI          Claude drafts report from stored fields only      (prompts/takedown.md)
