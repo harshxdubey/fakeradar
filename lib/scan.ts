@@ -78,18 +78,28 @@ async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResul
   const { unique, duplicatesRemoved } = dedupeByUrl(raw);
   const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers);
   const provider = aiProvider();
+  let aiOk = 0;
+  let aiError: string | undefined;
 
   const items: ScanItem[] = await mapLimit(candidates, 4, async (listing) => {
     if (!provider) return { listing, verdict: classifyWithRules(product, listing) };
     try {
-      return { listing, verdict: await classifyListing(product, listing) };
-    } catch {
+      const verdict = await classifyListing(product, listing);
+      aiOk++;
+      return { listing, verdict };
+    } catch (err) {
       // AI unavailable for this listing: fall back to the free rules rather than dropping it.
+      aiError ??= (err as Error).message.slice(0, 300);
+      console.error(`[scan] ${provider} classification failed for ${listing.asin}:`, (err as Error).message);
       return { listing, verdict: classifyWithRules(product, listing) };
     }
   });
 
-  return buildResult(product, raw, "live", provider ?? "rules", items, duplicatesRemoved, unique.length, authorised);
+  // Report what actually judged the listings, not just which key is configured.
+  const classifier = provider && aiOk > 0 ? provider : "rules";
+  const result = buildResult(product, raw, "live", classifier, items, duplicatesRemoved, unique.length, authorised);
+  if (provider && aiError) result.aiNote = `${provider === "gemini" ? "Gemini" : "Claude"} failed on ${items.length - aiOk} of ${items.length} listings (${aiError.slice(0, 120)}); those used the free rule checks.`;
+  return result;
 }
 
 export function runDemoScan(product: Product): ScanResult {

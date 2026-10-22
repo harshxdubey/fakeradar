@@ -50,6 +50,8 @@ export interface ScanResult {
   mode: "mock" | "live";
   /** Who judged the listings: pre-baked demo verdicts, Claude, Gemini, or the free rule checks. */
   classifier: "demo" | "claude" | "gemini" | "rules";
+  /** Set when the AI provider failed on some listings and the free rules filled in. */
+  aiNote?: string;
   product: Product;
   /** Unique listings found (after dedupe). */
   scanned: number;

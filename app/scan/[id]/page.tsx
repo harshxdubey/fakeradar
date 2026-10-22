@@ -124,6 +124,10 @@ export default function ScanPage() {
         <Link href="/new"><Button variant="outline" size="sm">Scan another product</Button></Link>
       </div>
 
+      {result.aiNote && (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{result.aiNote}</p>
+      )}
+
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Listings scanned" value={String(result.scanned)} />
         <Stat label="Suspected fakes" value={String(view.suspected)} tone="red" />

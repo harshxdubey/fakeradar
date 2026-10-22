@@ -97,10 +97,12 @@ export function classifyWithRules(product: Product, listing: Listing): Verdict {
     }
     return {
       label: "possible_genuine_reseller",
-      confidence: 0.72,
+      confidence: hasPrice ? 0.72 : 0.5,
       seller_risk: "low",
       evidence: [
-        `Uses your brand name "${product.brand}" at ${inr(listing.price)}, within or above your price`,
+        hasPrice
+          ? `Uses your brand name "${product.brand}" at ${inr(listing.price)}, within or above your price`
+          : `Uses your brand name "${product.brand}"; the listing shows no price, so it couldn't be compared`,
         `${sellerLine} — may be a distributor's customer; verify before reporting`,
       ],
     };
