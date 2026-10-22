@@ -1,9 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState, type FormEvent } from "react";
 import clsx from "clsx";
 import { ScanProgress } from "@/components/ScanProgress";
 import { Button, Card } from "@/components/ui";
+import { listProducts, type SavedProduct } from "@/lib/profile";
 import { resizePhoto, startScan } from "@/lib/startScan";
 import type { Marketplace, Product } from "@/lib/types";
 
@@ -29,6 +31,10 @@ export default function NewProduct() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedProduct[]>([]);
+  const [lastRun, setLastRun] = useState<Product | null>(null);
+
+  useEffect(() => setSaved(listProducts().filter((p) => !p.demo)), []);
 
   async function addPhotos(files: FileList | null) {
     if (!files?.length) return;
@@ -74,15 +80,27 @@ export default function NewProduct() {
     return Object.keys(e).length === 0;
   }
 
-  async function run() {
+  async function run(target: Product = product()) {
     setScanError(null);
     setScanning(true);
+    setLastRun(target);
     try {
-      const id = await startScan(product(), 6000);
+      const id = await startScan(target, 6000);
       router.push(`/scan/${id}`);
     } catch (e) {
       setScanError((e as Error).message);
     }
+  }
+
+  function edit(p: SavedProduct) {
+    setBrand(p.brand);
+    setName(p.name);
+    setMinPrice(String(p.minPrice || ""));
+    setMaxPrice(String(p.maxPrice || ""));
+    setSellers(p.authorisedSellers.join(", "));
+    setPhotos(p.photos);
+    setErrors({});
+    window.scrollTo({ top: document.getElementById("product-form")?.offsetTop ?? 0, behavior: "smooth" });
   }
 
   function onSubmit(e: FormEvent) {
@@ -99,7 +117,49 @@ export default function NewProduct() {
         We use this as the reference to tell your real product apart from fakes and copycats.
       </p>
 
-      <Card className="mt-6 p-6">
+      {saved.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold text-slate-700">Your products</h2>
+          <div className="mt-2 space-y-2">
+            {saved.map((p) => (
+              <Card key={p.key} className="flex items-center gap-3 p-3">
+                {p.photos[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.photos[0]} alt="" className="h-12 w-12 shrink-0 rounded-lg border object-cover" />
+                ) : (
+                  <div className="h-12 w-12 shrink-0 rounded-lg border bg-slate-50" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {p.brand} · {p.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {p.offenders.length} repeat-offender seller{p.offenders.length === 1 ? "" : "s"} ·{" "}
+                    {p.confirmedAsins.length} confirmed fake{p.confirmedAsins.length === 1 ? "" : "s"} ·{" "}
+                    {p.genuineSellers.length} seller{p.genuineSellers.length === 1 ? "" : "s"} marked genuine
+                    {p.lastScanId && (
+                      <>
+                        {" · "}
+                        <Link href={`/scan/${p.lastScanId}`} className="text-accent hover:underline">
+                          last scan
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => edit(p)}>
+                  Edit
+                </Button>
+                <Button size="sm" onClick={() => run(p)}>
+                  Scan again
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Card className="mt-6 p-6" id="product-form">
         <form onSubmit={onSubmit} className="space-y-5" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium">
@@ -195,7 +255,7 @@ export default function NewProduct() {
         <ScanProgress
           durationMs={6000}
           error={scanError}
-          onRetry={run}
+          onRetry={() => run(lastRun ?? product())}
           onCancel={() => {
             setScanning(false);
             setScanError(null);

@@ -1,6 +1,7 @@
 // Free classifier: plain rules on brand spelling, price and title, no AI and no cost.
 // It can't compare photos, so it is deliberately cautious; add ANTHROPIC_API_KEY to switch to Claude.
 import { inr } from "./format";
+import { PHOTO_SAME, PHOTO_SIMILAR } from "./imageHash";
 import type { Listing, Product, Verdict } from "./types";
 
 const STOPWORDS = new Set(["the", "and", "for", "with", "of", "a", "an", "in", "by", "to", "pack", "set", "new"]);
@@ -66,7 +67,11 @@ function nameOverlap(product: Product, listing: Listing) {
   return { share: Math.min(1, shared.length / Math.min(mine.length, 6)), shared };
 }
 
-export function classifyWithRules(product: Product, listing: Listing): Verdict {
+/**
+ * @param photoMatch 0–1 similarity of the listing photo to your closest authorised photo
+ *                   (free image fingerprint), or undefined when no photo could be compared.
+ */
+export function classifyWithRules(product: Product, listing: Listing, photoMatch?: number): Verdict {
   const brand = matchBrand(product, listing);
   const { share, shared } = nameOverlap(product, listing);
   const min = product.minPrice;
@@ -75,15 +80,27 @@ export function classifyWithRules(product: Product, listing: Listing): Verdict {
   const priceLine = hasPrice && pctBelow > 0 ? `Price ${inr(listing.price)} is ${pctBelow}% below your minimum ${inr(min)}` : null;
   const sellerLine = `Seller "${listing.seller}" is not on your authorised seller list`;
 
+  const compared = photoMatch !== undefined;
+  const pct = compared ? Math.round(photoMatch * 100) : 0;
+  const samePhoto = compared && photoMatch >= PHOTO_SAME;
+  const similarPhoto = compared && photoMatch >= PHOTO_SIMILAR;
+  const photoLine = samePhoto
+    ? `Photo is ${pct}% similar to your authorised photo — likely your own image, reused`
+    : similarPhoto
+      ? `Photo is ${pct}% similar to your authorised photo`
+      : compared
+        ? `Photo differs from your authorised photos (${pct}% similar)`
+        : "Photos could not be compared — add an authorised photo, or open the listing to check";
+
   if (brand.kind === "lookalike") {
     return {
       label: "counterfeit",
-      confidence: pctBelow >= 30 ? 0.9 : 0.8,
+      confidence: Math.min(0.95, (pctBelow >= 30 ? 0.9 : 0.8) + (similarPhoto ? 0.05 : 0)),
       seller_risk: "high",
       evidence: [
         `Brand reads "${brand.seen}" — a near-miss spelling of your brand "${product.brand}"`,
-        priceLine ?? sellerLine,
-        ...(priceLine ? [sellerLine] : []),
+        priceLine ?? (similarPhoto ? photoLine : sellerLine),
+        similarPhoto && priceLine ? photoLine : sellerLine,
       ],
     };
   }
@@ -94,18 +111,20 @@ export function classifyWithRules(product: Product, listing: Listing): Verdict {
         label: "counterfeit",
         confidence: pctBelow >= 50 ? 0.88 : 0.78,
         seller_risk: "high",
-        evidence: [`Uses your brand name "${product.brand}"`, priceLine!, sellerLine],
+        evidence: [`Uses your brand name "${product.brand}"`, priceLine!, compared ? photoLine : sellerLine],
       };
     }
     if (pctBelow > 0) {
+      // Slightly cheap + a photo that isn't yours is a stronger fake signal than price alone.
+      const differentPhoto = compared && !similarPhoto;
       return {
         label: "counterfeit",
-        confidence: 0.5,
-        seller_risk: "medium",
+        confidence: differentPhoto ? 0.72 : 0.5,
+        seller_risk: differentPhoto ? "high" : "medium",
         evidence: [
           `Uses your brand name "${product.brand}"`,
           `${priceLine} — could just be a discount`,
-          "Photos were not compared (free rule checks) — look closely or do a test buy before reporting",
+          differentPhoto ? `${photoLine} — a genuine listing usually shows your own photo` : photoLine,
         ],
       };
     }
@@ -118,6 +137,21 @@ export function classifyWithRules(product: Product, listing: Listing): Verdict {
           ? `Uses your brand name "${product.brand}" at ${inr(listing.price)}, within or above your price`
           : `Uses your brand name "${product.brand}"; the listing shows no price, so it couldn't be compared`,
         `${sellerLine} — may be a distributor's customer; verify before reporting`,
+        ...(compared ? [photoLine] : []),
+      ],
+    };
+  }
+
+  // A different brand using your photo is the clearest copycat signal there is.
+  if (samePhoto) {
+    return {
+      label: "copycat",
+      confidence: 0.86,
+      seller_risk: "high",
+      evidence: [
+        `Different brand${listing.brand ? ` ("${listing.brand}")` : ""} using a photo ${pct}% similar to your authorised photo`,
+        ...(shared.length >= 2 ? [`Title also reuses your product-name words: ${shared.join(", ")}`] : []),
+        sellerLine,
       ],
     };
   }
@@ -125,23 +159,23 @@ export function classifyWithRules(product: Product, listing: Listing): Verdict {
   if (share >= 0.75 && shared.length >= 2) {
     return {
       label: "copycat",
-      // Below the queue threshold on purpose: without a photo check, shared words alone land in Unsure.
-      confidence: 0.6,
+      // Below the queue threshold unless the photo also looks like yours.
+      confidence: similarPhoto ? 0.76 : 0.6,
       seller_risk: "medium",
       evidence: [
         `Different brand${listing.brand ? ` ("${listing.brand}")` : ""}, but the title reuses ${shared.length} of your product-name words: ${shared.join(", ")}`,
-        "Photos were not compared (free rule checks) — open the listing to check for copied images",
+        photoLine,
       ],
     };
   }
   if (share >= 0.5 && shared.length >= 2) {
     return {
       label: "copycat",
-      confidence: 0.4,
+      confidence: similarPhoto ? 0.6 : 0.4,
       seller_risk: "low",
       evidence: [
         `Title shares some of your product-name words (${shared.join(", ")}) — may just be a similar product`,
-        "Photos were not compared (free rule checks)",
+        photoLine,
       ],
     };
   }

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   }
   try {
     // The sample product on the home page always uses demo data, so the demo works in any mode.
-    if (body.demo || isMockMode()) return NextResponse.json({ result: runDemoScan(cleanProduct(product)) });
+    if (body.demo || isMockMode()) return NextResponse.json({ result: await runDemoScan(cleanProduct(product)) });
     return NextResponse.json(await startLiveScan(cleanProduct(product)));
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });

@@ -17,9 +17,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" aria-label="FakeRadar home">
               <Logo />
             </Link>
-            <Link href="/new" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">
-              + Add product
-            </Link>
+            <nav className="flex items-center gap-1">
+              <Link href="/takedowns" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                Takedowns
+              </Link>
+              <Link href="/new" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                + Add product
+              </Link>
+            </nav>
           </div>
         </header>
         <main>{children}</main>

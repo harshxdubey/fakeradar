@@ -22,6 +22,13 @@ npx vercel --prod   # production deploy
 
 Or push this repo to GitHub and import it at vercel.com/new — zero config. Add env vars in *Project → Settings → Environment Variables*.
 
+## What it does (v2)
+
+- **Free photo matching**: each listing photo is fingerprinted (dHash via `sharp`) and compared with your authorised photos. "Uses your photo · 94%" is the strongest copycat signal, at no AI cost.
+- **Smarter search**: every live scan runs 3 Amazon.in searches in one Apify run: brand + product, product without brand (copycats hiding your name), and brand alone.
+- **Brand memory** (in this browser): saved products with one-click re-scan, sellers you marked Genuine are skipped next time, sellers with confirmed fakes are flagged as repeat offenders, and a fake you confirmed that is still up is pushed to the top.
+- **Takedown tracker** (`/takedowns`): every confirmed fake from Not reported → Reported → Removed / Still live / Rejected, with dates and a **Re-check** button that visits the listing to see if it is gone.
+
 ## Environment variables
 
 | Var | Default | Purpose |
@@ -29,7 +36,7 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 | `USE_MOCK_DATA` | `true` | `true`: built-in mock listings + pre-baked verdicts. `false`: live Amazon.in scans. The home page's sample product always uses demo data. |
 | `APIFY_TOKEN` | – | Live data, **free tier**: FakeRadar runs the Apify Amazon scraper directly (no n8n needed). |
 | `APIFY_ACTOR` | `junglee/Amazon-crawler` | Apify actor used for the Amazon.in search. |
-| `APIFY_MAX_ITEMS` | `15` | Listings fetched per scan (each costs Apify credit). |
+| `APIFY_MAX_ITEMS` | `30` | Listings fetched per scan across the 3 searches (each costs Apify credit, about $0.005). |
 | `N8N_WEBHOOK_URL` | – | Optional alternative data source; takes priority over `APIFY_TOKEN`. |
 | `ANTHROPIC_API_KEY` | – | Optional. Set it to classify with Claude (compares photos). Empty = **free rule checks**. |
 | `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Model for both Claude calls. |

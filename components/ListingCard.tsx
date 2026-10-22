@@ -1,7 +1,8 @@
 "use client";
 import clsx from "clsx";
 import { inr, LABELS, RISK } from "@/lib/format";
-import type { Decision, Product, ScanItem } from "@/lib/types";
+import { PHOTO_SAME, PHOTO_SIMILAR } from "@/lib/imageHash";
+import type { Decision, Product, ScanItem, TakedownStatus } from "@/lib/types";
 import { Badge, Button, Card } from "./ui";
 
 export function ListingCard({
@@ -9,6 +10,7 @@ export function ListingCard({
   product,
   ownerPhoto,
   decision,
+  trackStatus,
   onDecide,
   onOpenTakedown,
 }: {
@@ -16,6 +18,7 @@ export function ListingCard({
   product: Product;
   ownerPhoto?: string;
   decision?: Decision;
+  trackStatus?: TakedownStatus;
   onDecide: (d: Decision) => void;
   onOpenTakedown: () => void;
 }) {
@@ -54,7 +57,11 @@ export function ListingCard({
             <span className="text-xs text-slate-500">
               · Seller risk <b className={risk.className}>{risk.text}</b>
             </span>
+            {item.photoMatch !== undefined && <PhotoBadge match={item.photoMatch} />}
             {confirmed && <Badge className="bg-red-600 text-white ring-red-600">Confirmed fake</Badge>}
+            {confirmed && trackStatus && trackStatus !== "confirmed" && (
+              <Badge className={TRACK[trackStatus].className}>{TRACK[trackStatus].text}</Badge>
+            )}
             {decision === "unsure" && <Badge className="bg-slate-100 text-slate-600 ring-slate-200">Marked unsure</Badge>}
           </div>
 
@@ -101,5 +108,28 @@ export function ListingCard({
         </div>
       </div>
     </Card>
+  );
+}
+
+export const TRACK: Record<TakedownStatus, { text: string; className: string }> = {
+  confirmed: { text: "Not reported yet", className: "bg-slate-100 text-slate-700 ring-slate-200" },
+  reported: { text: "Reported", className: "bg-sky-50 text-sky-700 ring-sky-200" },
+  removed: { text: "Removed ✓", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  still_live: { text: "Still live", className: "bg-amber-50 text-amber-800 ring-amber-200" },
+  rejected: { text: "Report rejected", className: "bg-red-50 text-red-700 ring-red-200" },
+};
+
+function PhotoBadge({ match }: { match: number }) {
+  const pct = Math.round(match * 100);
+  const [text, className] =
+    match >= PHOTO_SAME
+      ? [`Uses your photo · ${pct}%`, "bg-red-50 text-red-700 ring-red-200"]
+      : match >= PHOTO_SIMILAR
+        ? [`Similar photo · ${pct}%`, "bg-amber-50 text-amber-800 ring-amber-200"]
+        : [`Different photo · ${pct}%`, "bg-slate-100 text-slate-600 ring-slate-200"];
+  return (
+    <span title="Free image fingerprint compared with your authorised photos">
+      <Badge className={className}>{text}</Badge>
+    </span>
   );
 }

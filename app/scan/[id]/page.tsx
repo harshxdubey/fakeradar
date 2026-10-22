@@ -8,6 +8,7 @@ import { TakedownPanel } from "@/components/TakedownPanel";
 import { Button, Card, Spinner } from "@/components/ui";
 import { inr } from "@/lib/format";
 import { ASSUMED_UNITS_PER_WEEK, bucketFor, isSuspected } from "@/lib/rules";
+import { forgetGenuine, getTakedown, recordDecision } from "@/lib/profile";
 import { loadScan, updateScan, withDecision } from "@/lib/store";
 import type { Decision, ScanItem, StoredScan, VerdictLabel } from "@/lib/types";
 
@@ -26,7 +27,8 @@ export default function ScanPage() {
   const [state, setState] = useState<{ stored: StoredScan; photos: string[] } | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("all");
   const [panelFor, setPanelFor] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ text: string; undo?: StoredScan } | null>(null);
+  const [, setTrackTick] = useState(0);
+  const [toast, setToast] = useState<{ text: string; undo?: StoredScan; onUndo?: () => void } | null>(null);
 
   useEffect(() => {
     setState(loadScan(id));
@@ -97,7 +99,15 @@ export default function ScanPage() {
   function decide(item: ScanItem, d: Decision) {
     const prev = state!.stored;
     save(withDecision(prev, item.listing.id, d));
-    if (d === "genuine") setToast({ text: `“${item.listing.seller}” added to your authorised sellers`, undo: prev });
+    // Brand memory: future scans skip genuine sellers and flag repeat offenders.
+    recordDecision(product, item.listing, d, { scanId: id, demo: result.mode === "mock" });
+    if (d === "genuine") {
+      setToast({
+        text: `“${item.listing.seller}” added to your authorised sellers — future scans will skip them`,
+        undo: prev,
+        onUndo: () => forgetGenuine(product, item.listing.seller),
+      });
+    }
     if (d === "unsure") setToast({ text: "Moved to Unsure — check it later, or do a test buy" });
     if (d === "confirmed") setPanelFor(item.listing.id);
   }
@@ -195,6 +205,7 @@ export default function ScanPage() {
               product={product}
               ownerPhoto={ownerPhoto}
               decision={state.stored.decisions[item.listing.id]}
+              trackStatus={getTakedown(item.listing.asin)?.status}
               onDecide={(d) => decide(item, d)}
               onOpenTakedown={() => setPanelFor(item.listing.id)}
             />
@@ -213,6 +224,7 @@ export default function ScanPage() {
             save({ ...s, takedowns: { ...s.takedowns, [panelItem.listing.id]: text } });
           }}
           onClose={() => setPanelFor(null)}
+          onTracked={() => setTrackTick((n) => n + 1)}
         />
       )}
 
@@ -224,6 +236,7 @@ export default function ScanPage() {
               className="font-semibold text-indigo-300 hover:text-indigo-200"
               onClick={() => {
                 save(toast.undo!);
+                toast.onUndo?.();
                 setToast(null);
               }}
             >

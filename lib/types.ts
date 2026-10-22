@@ -9,6 +9,11 @@ export interface Product {
   photos: string[];
   authorisedSellers: string[];
   marketplace: Marketplace;
+  /** 64-bit image fingerprints (hex) of the authorised photos, computed in the browser. */
+  photoHashes?: string[];
+  /** Brand history sent with each scan, so repeat offenders and re-listed fakes stand out. */
+  knownOffenders?: { seller: string; count: number }[];
+  confirmedAsins?: string[];
 }
 
 /** One marketplace listing — also the contract the n8n webhook must return. */
@@ -42,6 +47,8 @@ export interface Verdict {
 export interface ScanItem {
   listing: Listing;
   verdict: Verdict;
+  /** 0–1 similarity between the listing photo and the closest authorised photo. */
+  photoMatch?: number;
 }
 
 export interface ScanResult {
@@ -68,6 +75,35 @@ export interface StoredScan {
   result: ScanResult;
   decisions: Record<string, Decision>;
   takedowns: Record<string, string>;
+}
+
+export type TakedownStatus = "confirmed" | "reported" | "removed" | "still_live" | "rejected";
+
+/** One confirmed fake followed from confirmation to removal, across scans. */
+export interface TrackedTakedown {
+  asin: string;
+  url: string;
+  title: string;
+  seller: string;
+  price: number;
+  imageUrl: string;
+  productKey: string;
+  productLabel: string;
+  scanId: string;
+  demo: boolean;
+  status: TakedownStatus;
+  confirmedAt: string;
+  reportedAt?: string;
+  checkedAt?: string;
+  checkNote?: string;
+}
+
+export interface RecheckResult {
+  live: boolean;
+  title?: string;
+  price?: number;
+  seller?: string;
+  note: string;
 }
 
 export type Bucket = "queue" | "unsure" | "hidden";

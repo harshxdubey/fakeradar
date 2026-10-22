@@ -1,4 +1,6 @@
 "use client";
+import { hashPhotos } from "./imageHash.client";
+import { saveProduct, setLastScan, withHistory } from "./profile";
 import { saveScan } from "./store";
 import type { PendingScan, Product, ScanResult } from "./types";
 
@@ -45,17 +47,23 @@ async function post(url: string, body: object): Promise<ScanResponse> {
  * Run a scan, keeping the progress screen up for at least `minMs` so the steps are readable.
  * Live scans run on Apify in the background, so this polls until the scraper finishes.
  */
-export async function startScan(product: Product, minMs: number, opts: { demo?: boolean } = {}): Promise<string> {
+export async function startScan(input: Product, minMs: number, opts: { demo?: boolean } = {}): Promise<string> {
   const started = Date.now();
+  // Remember the product, then send it with photo fingerprints and what earlier scans learned.
+  const saved = saveProduct(input, Boolean(opts.demo));
+  const product: Product = { ...withHistory(input), photoHashes: await hashPhotos(input.photos) };
+
   let json = await post("/api/scan", { product, demo: opts.demo });
   while (!json.result && json.pending) {
     if (Date.now() - started > MAX_WAIT_MS) throw new Error("The Amazon.in search is taking too long. Please try again.");
     await sleep(POLL_MS);
-    json = await post("/api/scan/poll", { product: { ...product, photos: [] }, pending: json.pending });
+    // Photos ride along so an AI checker can compare them when the scraper finishes.
+    json = await post("/api/scan/poll", { product, pending: json.pending });
   }
   if (!json.result) throw new Error(json.error || "Scan returned no result");
   const wait = minMs - (Date.now() - started);
   if (wait > 0) await sleep(wait);
-  saveScan(json.result, product.photos);
+  saveScan(json.result, input.photos);
+  setLastScan(saved.key, json.result.id);
   return json.result.id;
 }

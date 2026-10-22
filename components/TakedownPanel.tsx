@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { openEvidenceSheet } from "@/lib/evidence";
+import { getTakedown, setTakedownStatus } from "@/lib/profile";
 import { inr, VIOLATION_TYPE } from "@/lib/format";
 import { TRADEMARK_PLACEHOLDER } from "@/lib/takedown";
 import type { Product, ScanItem } from "@/lib/types";
@@ -13,6 +15,7 @@ export function TakedownPanel({
   cachedText,
   onText,
   onClose,
+  onTracked,
 }: {
   item: ScanItem;
   product: Product;
@@ -20,6 +23,7 @@ export function TakedownPanel({
   cachedText?: string;
   onText: (text: string) => void;
   onClose: () => void;
+  onTracked?: () => void;
 }) {
   const { listing, verdict } = item;
   const [text, setText] = useState(cachedText ?? "");
@@ -27,6 +31,13 @@ export function TakedownPanel({
   const [error, setError] = useState<string | null>(null);
   const [trademark, setTrademark] = useState("");
   const [copied, setCopied] = useState(false);
+  const [tracked, setTracked] = useState(() => getTakedown(listing.asin));
+
+  function markReported() {
+    setTakedownStatus(listing.asin, "reported");
+    setTracked(getTakedown(listing.asin));
+    onTracked?.();
+  }
 
   async function load() {
     setLoading(true);
@@ -138,6 +149,15 @@ export function TakedownPanel({
           <Button variant="outline" onClick={() => openEvidenceSheet(product, ownerPhoto, item)}>
             Download evidence (PDF)
           </Button>
+          {tracked && tracked.status === "confirmed" ? (
+            <Button variant="success" onClick={markReported} title="Click after you submit the report on Amazon">
+              I've reported it ✓
+            </Button>
+          ) : tracked ? (
+            <Link href="/takedowns" className="self-center text-sm text-accent hover:underline">
+              Reported {tracked.reportedAt ? new Date(tracked.reportedAt).toLocaleDateString("en-IN") : ""} · Track it →
+            </Link>
+          ) : null}
         </div>
       </aside>
     </div>

@@ -3,6 +3,8 @@
 // Classifier: Claude (direct or OpenRouter), else Gemini, else the free rule checks.
 import { getRunListings, getRunStatus, hasApifyToken, startApifyRun } from "./apify";
 import { aiProvider, classifyListing } from "./claude";
+import { bestMatch } from "./imageHash";
+import { hashImage } from "./imageHash.server";
 import { mockSearch } from "./mock";
 import { dedupeByUrl, splitAuthorised } from "./rules";
 import { classifyWithRules } from "./rulesClassifier";
@@ -17,6 +19,9 @@ export function cleanProduct(product: Product): Product {
     maxPrice: Number(product.maxPrice) || 0,
     photos: (product.photos || []).slice(0, 3),
     authorisedSellers: (product.authorisedSellers || []).map(String),
+    photoHashes: (product.photoHashes || []).filter((h) => /^[0-9a-f]{16}$/.test(h)).slice(0, 3),
+    knownOffenders: (product.knownOffenders || []).slice(0, 200),
+    confirmedAsins: (product.confirmedAsins || []).map(String).slice(0, 500),
   };
 }
 
@@ -82,16 +87,17 @@ async function classifyLive(product: Product, raw: Listing[]): Promise<ScanResul
   let aiError: string | undefined;
 
   const items: ScanItem[] = await mapLimit(candidates, 4, async (listing) => {
-    if (!provider) return { listing, verdict: classifyWithRules(product, listing) };
+    const photoMatch = bestMatch(await hashImage(listing.imageUrl), product.photoHashes);
+    if (!provider) return applyHistory(product, { listing, photoMatch, verdict: classifyWithRules(product, listing, photoMatch) });
     try {
       const verdict = await classifyListing(product, listing);
       aiOk++;
-      return { listing, verdict };
+      return applyHistory(product, { listing, photoMatch, verdict });
     } catch (err) {
       // AI unavailable for this listing: fall back to the free rules rather than dropping it.
       aiError ??= (err as Error).message.slice(0, 300);
       console.error(`[scan] ${provider} classification failed for ${listing.asin}:`, (err as Error).message);
-      return { listing, verdict: classifyWithRules(product, listing) };
+      return applyHistory(product, { listing, photoMatch, verdict: classifyWithRules(product, listing, photoMatch) });
     }
   });
 
@@ -117,12 +123,52 @@ function explainAiError(raw: string, provider: "claude" | "gemini"): string {
   return `the AI service returned an error (${raw.replace(/\s+/g, " ").slice(0, 80)}).`;
 }
 
-export function runDemoScan(product: Product): ScanResult {
+export async function runDemoScan(product: Product): Promise<ScanResult> {
   const { listings, verdicts } = mockSearch(product);
   const { unique, duplicatesRemoved } = dedupeByUrl(listings);
   const { authorised, candidates } = splitAuthorised(unique, product.authorisedSellers);
-  const items: ScanItem[] = candidates.map((listing) => ({ listing, verdict: verdicts[listing.id] as Verdict }));
+  const items: ScanItem[] = await mapLimit(candidates, 6, async (listing) =>
+    applyHistory(product, {
+      listing,
+      verdict: verdicts[listing.id] as Verdict,
+      photoMatch: bestMatch(await hashImage(listing.imageUrl), product.photoHashes),
+    }),
+  );
   return buildResult(product, listings, "mock", "demo", items, duplicatesRemoved, unique.length, authorised);
+}
+
+const norm = (s: string) => s.trim().toLowerCase();
+
+/**
+ * Brand memory: a listing you already confirmed as fake that is still up, or a seller with
+ * earlier confirmed fakes, is pushed to the top with that history as the first reason.
+ */
+function applyHistory(product: Product, item: ScanItem): ScanItem {
+  const { listing } = item;
+  let verdict = item.verdict;
+  if (product.confirmedAsins?.includes(listing.asin)) {
+    verdict = {
+      label: verdict.label === "copycat" ? "copycat" : "counterfeit",
+      confidence: Math.max(verdict.confidence, 0.95),
+      seller_risk: "high",
+      evidence: ["You already confirmed this listing as fake — it is still live", ...verdict.evidence].slice(0, 3),
+    };
+  } else {
+    const offender = product.knownOffenders?.find((o) => norm(o.seller) === norm(listing.seller));
+    if (offender && verdict.label !== "unrelated") {
+      verdict = {
+        ...verdict,
+        label: verdict.label === "possible_genuine_reseller" ? "counterfeit" : verdict.label,
+        confidence: Math.min(0.95, Math.max(verdict.confidence, 0.6) + 0.15),
+        seller_risk: "high",
+        evidence: [
+          `Repeat offender: you confirmed ${offender.count} fake listing${offender.count === 1 ? "" : "s"} from "${offender.seller}" before`,
+          ...verdict.evidence,
+        ].slice(0, 3),
+      };
+    }
+  }
+  return { ...item, verdict };
 }
 
 /** Starts a live scan. n8n answers in one request; Apify runs in the background and is polled. */
