@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Button, Card, Spinner } from "./ui";
+import { Radar } from "./Radar";
+import { Button } from "./ui";
 
-const STEPS = ["Searching marketplaces…", "Filtering authorised sellers…", "Comparing photos and listings…"];
+const STEPS = ["Searching marketplaces", "Filtering authorised sellers", "Comparing photos and listings"];
 
 export function ScanProgress({
   durationMs,
@@ -27,43 +28,46 @@ export function ScanProgress({
   }, [durationMs, error]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <Card className="w-full max-w-md p-6" role="status" aria-live="polite">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 p-6 backdrop-blur-2xl">
+      <div className="w-full max-w-sm animate-fade-up text-center" role="status" aria-live="polite">
         {error ? (
           <>
-            <h2 className="text-lg font-semibold text-red-700">Scan failed</h2>
-            <p className="mt-2 text-sm text-slate-600">{error}</p>
-            <div className="mt-5 flex gap-2">
+            <p className="text-2xl font-semibold tracking-tight text-fake">Scan didn’t finish</p>
+            <p className="mt-3 text-[15px] text-ink-soft">{error}</p>
+            <div className="mt-8 flex justify-center gap-3">
               {onRetry && <Button onClick={onRetry}>Try again</Button>}
-              {onCancel && <Button variant="outline" onClick={onCancel}>Back</Button>}
+              {onCancel && (
+                <Button variant="outline" onClick={onCancel}>
+                  Back
+                </Button>
+              )}
             </div>
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold">Scanning for fakes</h2>
-            <ol className="mt-4 space-y-3">
+            <Radar className="mx-auto w-56" labels={false} />
+            <p className="mt-8 text-2xl font-semibold tracking-tight">Scanning for fakes</p>
+            <div className="relative mt-3 h-6 overflow-hidden">
               {STEPS.map((s, i) => (
-                <li key={s} className={clsx("flex items-center gap-3 text-sm", i > step && "text-slate-400")}>
-                  {i < step ? (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] text-white">✓</span>
-                  ) : i === step ? (
-                    <Spinner className="h-5 w-5 text-accent" />
-                  ) : (
-                    <span className="h-5 w-5 rounded-full border-2 border-slate-200" />
+                <p
+                  key={s}
+                  className={clsx(
+                    "absolute inset-x-0 text-[15px] text-ink-soft transition-all duration-500",
+                    i === step ? "translate-y-0 opacity-100" : i < step ? "-translate-y-4 opacity-0" : "translate-y-4 opacity-0",
                   )}
-                  {s}
-                </li>
+                >
+                  {s}…
+                </p>
               ))}
-            </ol>
-            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-accent transition-all duration-700"
-                style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-              />
+            </div>
+            <div className="mx-auto mt-6 flex w-24 justify-center gap-1.5">
+              {STEPS.map((_, i) => (
+                <span key={i} className={clsx("h-1.5 flex-1 rounded-full transition-colors duration-500", i <= step ? "bg-accent" : "bg-black/10")} />
+              ))}
             </div>
           </>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

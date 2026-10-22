@@ -5,11 +5,11 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 type Variant = "primary" | "outline" | "ghost" | "danger" | "success";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:bg-accent-ink shadow-sm",
-  outline: "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
-  ghost: "text-slate-700 hover:bg-slate-100",
-  danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
-  success: "border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+  primary: "bg-accent text-white hover:bg-accent-ink shadow-soft hover:shadow-lift",
+  outline: "border border-black/10 bg-white text-ink hover:bg-black/[0.03]",
+  ghost: "text-ink/80 hover:bg-black/[0.04]",
+  danger: "bg-fake text-white hover:bg-[#c8431f] shadow-soft",
+  success: "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
 };
 
 export function Button({
@@ -21,10 +21,10 @@ export function Button({
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-        size === "sm" && "h-8 px-3 text-sm",
-        size === "md" && "h-10 px-4 text-sm",
-        size === "lg" && "h-12 px-6 text-base",
+        "inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        size === "sm" && "h-8 px-3.5 text-sm",
+        size === "md" && "h-10 px-5 text-sm",
+        size === "lg" && "h-12 px-7 text-[17px]",
         variants[variant],
         className,
       )}
@@ -34,7 +34,7 @@ export function Button({
 }
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={clsx("rounded-xl border border-slate-200 bg-white shadow-sm", className)} {...props} />;
+  return <div className={clsx("rounded-2xl border border-black/[0.06] bg-white shadow-soft", className)} {...props} />;
 }
 
 export function Badge({ className, children }: { className?: string; children: ReactNode }) {

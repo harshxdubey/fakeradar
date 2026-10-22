@@ -1,19 +1,39 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Radar } from "@/components/Radar";
+import { Reveal } from "@/components/Reveal";
 import { ScanProgress } from "@/components/ScanProgress";
-import { Button, Card } from "@/components/ui";
 import { productShot } from "@/lib/images";
 import { SAMPLE_PRODUCT } from "@/lib/mock";
 import { startScan } from "@/lib/startScan";
 
-const EXAMPLE_FAKE = productShot({ brand: "TerraSlp", tagline: "BAMBOO · STEEL · 1 LITRE", sticker: "70% OFF" });
+const EXAMPLE_FAKE = productShot({ brand: "TerraSlp", tagline: "BAMBOO · STEEL · 1 LITRE", sticker: "70% OFF", background: "#f5f5f7" });
+const EXAMPLE_REAL = productShot({ brand: "TerraSip", tagline: "BAMBOO · STEEL · 1 LITRE", background: "#f5f5f7" });
+
+const icon = (d: ReactNode) => (
+  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    {d}
+  </svg>
+);
 
 const STEPS = [
-  { n: "1", title: "Upload", body: "Add your product photo, price range and the sellers you've authorised." },
-  { n: "2", title: "Scan", body: "We search Amazon.in and AI compares every listing against your real product." },
-  { n: "3", title: "Confirm & report", body: "You confirm each fake. We draft the takedown report — you submit it." },
+  {
+    title: "Add your product once.",
+    body: "A photo, your price range and the sellers you trust.",
+    icon: icon(<><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></>),
+  },
+  {
+    title: "It scans every day.",
+    body: "Amazon.in, Flipkart and Myntra — photos, prices, sellers.",
+    icon: icon(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><path d="M12 12 18 6" /></>),
+  },
+  {
+    title: "You confirm. It reports.",
+    body: "Evidence on every flag and a takedown ready to paste.",
+    icon: icon(<><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z" /><path d="m8.5 12 2.5 2.5 4.5-5" /></>),
+  },
 ];
 
 export default function Home() {
@@ -32,65 +52,163 @@ export default function Home() {
     }
   }
 
-  return (
-    <div className="mx-auto max-w-6xl px-4">
-      <section className="grid items-center gap-10 py-14 md:grid-cols-2 md:py-20">
-        <div>
-          <p className="mb-3 inline-flex rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-ink">
-            For small D2C brands · Amazon.in today, Flipkart &amp; Meesho next
-          </p>
-          <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-            Find fakes of your product in 2 minutes
-          </h1>
-          <p className="mt-4 max-w-lg text-lg text-slate-600">
-            Stop spending a day hunting counterfeit and copycat listings by hand. FakeRadar finds them, shows you
-            the evidence, and drafts the takedown — you stay in control of every report.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button size="lg" onClick={trySample}>
-              Try with sample product
-            </Button>
-            <Link href="/new">
-              <Button size="lg" variant="outline">Add your product</Button>
-            </Link>
-          </div>
-          <p className="mt-3 text-sm text-slate-500">No sign-up. Sample: “TerraSip Bamboo Steel Water Bottle 1L”.</p>
-        </div>
+  const ctas = (dark = false) => (
+    <div className="flex flex-wrap items-center justify-center gap-4">
+      <button
+        onClick={trySample}
+        className="rounded-full bg-accent px-7 py-3.5 text-[17px] font-medium text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-accent-ink hover:shadow-lift active:translate-y-0"
+      >
+        Try it with a sample
+      </button>
+      <Link
+        href="/new"
+        className={
+          dark
+            ? "rounded-full px-5 py-3.5 text-[17px] font-medium text-indigo-300 transition hover:text-white"
+            : "rounded-full px-5 py-3.5 text-[17px] font-medium text-accent transition hover:text-accent-ink"
+        }
+      >
+        Add your product ›
+      </Link>
+    </div>
+  );
 
-        <Card className="overflow-hidden">
-          <div className="border-b border-slate-100 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Example flag
-          </div>
-          <div className="grid grid-cols-2 gap-3 p-5">
-            <figure>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={SAMPLE_PRODUCT.photos[0]} alt="Your authorised product" className="aspect-square w-full rounded-lg border" />
-              <figcaption className="mt-1 text-center text-xs text-slate-500">Your product</figcaption>
-            </figure>
-            <figure>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={EXAMPLE_FAKE} alt="Suspected fake listing" className="aspect-square w-full rounded-lg border-2 border-red-300" />
-              <figcaption className="mt-1 text-center text-xs text-red-600">Listing on Amazon.in · ₹259</figcaption>
-            </figure>
-          </div>
-          <ul className="space-y-1 border-t border-slate-100 px-5 py-4 text-sm text-slate-700">
-            <li>• Brand reads “TerraSlp” — one letter off</li>
-            <li>• Price 68% below your minimum</li>
-            <li>• Seller isn’t on your authorised list</li>
-          </ul>
-        </Card>
+  return (
+    <div className="overflow-hidden">
+      {/* Hero */}
+      <section className="mx-auto max-w-5xl px-6 pb-8 pt-20 text-center md:pt-28">
+        <p className="animate-fade-up text-[15px] font-semibold text-fake">New · Amazon.in, Flipkart and Myntra</p>
+        <h1 className="mt-4 animate-fade-up text-balance text-5xl font-semibold leading-[1.05] tracking-[-0.02em] [animation-delay:80ms] md:text-7xl">
+          Find the fakes.
+          <br />
+          <span className="text-gradient">
+            Before your <span className="whitespace-nowrap">customers do.</span>
+          </span>
+        </h1>
+        <p className="mx-auto mt-6 max-w-2xl animate-fade-up text-xl leading-relaxed text-ink-soft [animation-delay:160ms] md:text-2xl">
+          FakeRadar watches the marketplaces for copies of your product, shows you the proof, and drafts the takedown.
+        </p>
+        <div className="mt-10 animate-fade-up [animation-delay:240ms]">{ctas()}</div>
+        <p className="mt-3 animate-fade-up text-sm text-ink-faint [animation-delay:240ms]">No sign-up. Takes about 10 seconds.</p>
       </section>
 
-      <section className="grid gap-4 pb-16 md:grid-cols-3">
-        {STEPS.map((s) => (
-          <Card key={s.n} className="p-6">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-ink">
-              {s.n}
-            </span>
-            <h3 className="mt-3 font-semibold">{s.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">{s.body}</p>
-          </Card>
-        ))}
+      <div className="mx-auto max-w-[560px] animate-fade-up px-6 [animation-delay:320ms]">
+        <Radar className="animate-float" />
+      </div>
+
+      <Reveal className="mx-auto mt-12 max-w-4xl px-6 text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-ink-faint">Watching</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-12 gap-y-3 text-2xl font-semibold tracking-tight text-ink-soft md:text-3xl">
+          <span>Amazon.in</span>
+          <span>Flipkart</span>
+          <span>Myntra</span>
+        </div>
+      </Reveal>
+
+      {/* Spot the difference */}
+      <section className="mt-28 bg-white py-24 md:mt-36 md:py-32">
+        <div className="mx-auto max-w-6xl px-6">
+          <Reveal className="text-center">
+            <h2 className="text-balance text-4xl font-semibold tracking-[-0.02em] md:text-6xl">One letter off. 68% cheaper.</h2>
+            <p className="mt-4 text-xl text-ink-soft md:text-2xl">FakeRadar spots what a quick look misses.</p>
+          </Reveal>
+
+          <div className="mt-16 grid items-center gap-8 md:grid-cols-[1fr_auto_1fr]">
+            <Reveal>
+              <figure className="rounded-[28px] bg-canvas p-8 shadow-soft">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={EXAMPLE_REAL} alt="Your authorised product" className="mx-auto aspect-square w-full max-w-sm rounded-2xl" />
+                <figcaption className="mt-5 text-center">
+                  <span className="block text-lg font-semibold">Your product</span>
+                  <span className="text-ink-soft">TerraSip · ₹799</span>
+                </figcaption>
+              </figure>
+            </Reveal>
+
+            <Reveal delay={150} className="flex justify-center">
+              <span className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white">vs</span>
+            </Reveal>
+
+            <Reveal delay={250}>
+              <figure className="relative rounded-[28px] bg-fake-soft p-8 shadow-soft ring-2 ring-fake/30">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={EXAMPLE_FAKE} alt="A fake listing" className="mx-auto aspect-square w-full max-w-sm rounded-2xl" />
+                <figcaption className="mt-5 text-center">
+                  <span className="block text-lg font-semibold text-fake">Listing on Amazon.in</span>
+                  <span className="text-ink-soft">TerraSlp · ₹259</span>
+                </figcaption>
+              </figure>
+            </Reveal>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2">
+            {[
+              ["Brand reads “TerraSlp”", "one letter off yours"],
+              ["₹259", "68% below your minimum"],
+              ["Uses your photo", "92% match"],
+              ["Unknown seller", "not on your list"],
+            ].map(([a, b], i) => (
+              <Reveal key={a} delay={100 * i}>
+                <div className="flex items-center gap-3 rounded-2xl bg-canvas px-5 py-4">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fake text-sm font-bold text-white">!</span>
+                  <p className="text-[17px]">
+                    <span className="font-semibold">{a}</span> <span className="text-ink-soft">— {b}</span>
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+        <Reveal className="text-center">
+          <h2 className="text-balance text-4xl font-semibold tracking-[-0.02em] md:text-6xl">Set it up once. That’s it.</h2>
+        </Reveal>
+        <div className="mt-16 grid gap-6 md:grid-cols-3">
+          {STEPS.map((s, i) => (
+            <Reveal key={s.title} delay={120 * i}>
+              <div className="h-full rounded-[28px] bg-white p-8 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-lift">
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">{s.icon}</span>
+                <p className="mt-8 text-sm font-semibold text-ink-faint">Step {i + 1}</p>
+                <h3 className="mt-1 text-2xl font-semibold tracking-tight">{s.title}</h3>
+                <p className="mt-2 text-[17px] leading-relaxed text-ink-soft">{s.body}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Numbers */}
+      <section className="bg-white py-24 md:py-32">
+        <div className="mx-auto grid max-w-6xl gap-12 px-6 text-center md:grid-cols-3">
+          {[
+            ["57", "listings checked in one scan"],
+            ["89s", "across three marketplaces"],
+            ["~9 hrs", "back every week"],
+          ].map(([n, l], i) => (
+            <Reveal key={l} delay={120 * i}>
+              <p className="text-6xl font-semibold tracking-[-0.03em] text-gradient md:text-7xl">{n}</p>
+              <p className="mt-3 text-lg text-ink-soft">{l}</p>
+            </Reveal>
+          ))}
+        </div>
+        <Reveal className="mt-10 text-center">
+          <p className="text-sm text-ink-faint">From a live test on real listings. Time saved is an estimate for one product.</p>
+        </Reveal>
+      </section>
+
+      {/* Closing */}
+      <section className="bg-[#1d1d1f] py-24 text-center text-white md:py-32">
+        <Reveal className="mx-auto max-w-3xl px-6">
+          <div className="mx-auto mb-10 w-44">
+            <Radar labels={false} tone="dark" />
+          </div>
+          <h2 className="text-balance text-4xl font-semibold tracking-[-0.02em] md:text-6xl">See it work in seconds.</h2>
+          <p className="mx-auto mt-4 max-w-xl text-xl text-white/60">Run a scan on a sample product. Nothing is ever reported without&nbsp;you.</p>
+          <div className="mt-10">{ctas(true)}</div>
+        </Reveal>
       </section>
 
       {scanning && (

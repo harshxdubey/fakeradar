@@ -14,24 +14,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen">
         <WorkspaceSync />
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-            <Link href="/" aria-label="FakeRadar home">
+        <header className="sticky top-0 z-30 border-b border-black/5 bg-white/70 backdrop-blur-xl backdrop-saturate-150">
+          <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-6">
+            <Link href="/" aria-label="FakeRadar home" className="transition hover:opacity-80">
               <Logo />
             </Link>
-            <nav className="flex items-center gap-1">
-              <Link href="/takedowns" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">
+            <nav className="flex items-center gap-6 text-[13px] text-ink/80">
+              <Link href="/takedowns" className="transition hover:text-ink">
                 Takedowns
               </Link>
-              <Link href="/new" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">
-                + Add product
+              <Link href="/new" className="rounded-full bg-ink px-3.5 py-1.5 font-medium text-white transition hover:bg-black">
+                Add product
               </Link>
             </nav>
           </div>
         </header>
         <main>{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-slate-400">
-          FakeRadar prototype · Never files reports for you — you review and submit every takedown yourself.
+        <footer className="border-t border-black/5">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-8 text-xs text-ink-faint">
+            <span>FakeRadar · Amazon.in, Flipkart and Myntra</span>
+            <span>Never files reports for you. You review and submit every takedown.</span>
+          </div>
         </footer>
       </body>
     </html>
