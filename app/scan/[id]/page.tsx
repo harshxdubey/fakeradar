@@ -1,0 +1,227 @@
+"use client";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
+import { ListingCard } from "@/components/ListingCard";
+import { TakedownPanel } from "@/components/TakedownPanel";
+import { Button, Card, Spinner } from "@/components/ui";
+import { inr } from "@/lib/format";
+import { ASSUMED_UNITS_PER_WEEK, bucketFor, isSuspected } from "@/lib/rules";
+import { loadScan, updateScan, withDecision } from "@/lib/store";
+import type { Decision, ScanItem, StoredScan, VerdictLabel } from "@/lib/types";
+
+type Tab = "all" | Exclude<VerdictLabel, "unrelated"> | "unsure";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "counterfeit", label: "Counterfeit" },
+  { id: "copycat", label: "Copycat" },
+  { id: "possible_genuine_reseller", label: "Possible reseller" },
+  { id: "unsure", label: "Unsure" },
+];
+
+export default function ScanPage() {
+  const { id } = useParams<{ id: string }>();
+  const [state, setState] = useState<{ stored: StoredScan; photos: string[] } | null | undefined>(undefined);
+  const [tab, setTab] = useState<Tab>("all");
+  const [panelFor, setPanelFor] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; undo?: StoredScan } | null>(null);
+
+  useEffect(() => {
+    setState(loadScan(id));
+  }, [id]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const view = useMemo(() => {
+    if (!state) return null;
+    const { result, decisions } = state.stored;
+    const withBucket = result.items.map((item) => ({ item, bucket: bucketFor(item, decisions[item.listing.id]) }));
+    const queue = withBucket.filter((x) => x.bucket === "queue").map((x) => x.item);
+    const unsure = withBucket.filter((x) => x.bucket === "unsure").map((x) => x.item);
+    const hiddenUnrelated = result.items.filter((i) => i.verdict.label === "unrelated").length;
+    const suspected = [...queue, ...unsure].filter(isSuspected).length;
+    const confirmed = Object.values(decisions).filter((d) => d === "confirmed").length;
+    const avgPrice = (result.product.minPrice + result.product.maxPrice) / 2;
+    const counts: Record<Tab, number> = {
+      all: queue.length,
+      counterfeit: queue.filter((i) => i.verdict.label === "counterfeit").length,
+      copycat: queue.filter((i) => i.verdict.label === "copycat").length,
+      possible_genuine_reseller: queue.filter((i) => i.verdict.label === "possible_genuine_reseller").length,
+      unsure: unsure.length,
+    };
+    const shown: ScanItem[] = tab === "all" ? queue : tab === "unsure" ? unsure : queue.filter((i) => i.verdict.label === tab);
+    return { result, queue, unsure, hiddenUnrelated, suspected, confirmed, revenue: suspected * avgPrice * ASSUMED_UNITS_PER_WEEK, counts, shown };
+  }, [state, tab]);
+
+  if (state === undefined) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-32 text-slate-500">
+        <Spinner /> Loading scan…
+      </div>
+    );
+  }
+
+  if (state === null || !view) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24 text-center">
+        <h1 className="text-xl font-semibold">Scan not found</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Scans are saved in this browser only. It may have been cleared, or opened on a different device.
+        </p>
+        <div className="mt-6 flex justify-center gap-2">
+          <Link href="/new"><Button>Start a new scan</Button></Link>
+          <Link href="/"><Button variant="outline">Home</Button></Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { result } = view;
+  const product = result.product;
+  const ownerPhoto = state.photos[0];
+
+  function save(next: StoredScan) {
+    updateScan(id, next);
+    setState((s) => (s ? { ...s, stored: next } : s));
+  }
+
+  function decide(item: ScanItem, d: Decision) {
+    const prev = state!.stored;
+    save(withDecision(prev, item.listing.id, d));
+    if (d === "genuine") setToast({ text: `“${item.listing.seller}” added to your authorised sellers`, undo: prev });
+    if (d === "unsure") setToast({ text: "Moved to Unsure — check it later, or do a test buy" });
+    if (d === "confirmed") setPanelFor(item.listing.id);
+  }
+
+  const panelItem = panelFor ? result.items.find((i) => i.listing.id === panelFor) : undefined;
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Amazon.in scan · {new Date(result.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+            {result.mode === "mock" && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Demo data</span>}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">
+            {product.brand} · {product.name}
+          </h1>
+        </div>
+        <Link href="/new"><Button variant="outline" size="sm">Scan another product</Button></Link>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="Listings scanned" value={String(result.scanned)} />
+        <Stat label="Suspected fakes" value={String(view.suspected)} tone="red" />
+        <Stat label="Confirmed" value={String(view.confirmed)} />
+        <Stat
+          label="Revenue at risk / week"
+          value={inr(view.revenue)}
+          hint={`Estimate: suspected × avg price × ${ASSUMED_UNITS_PER_WEEK} units/week`}
+        />
+      </div>
+
+      <p className="mt-3 text-xs text-slate-500">
+        Before AI: {result.duplicatesRemoved} duplicate{result.duplicatesRemoved === 1 ? "" : "s"} removed ·{" "}
+        {result.authorisedFiltered.length} listing{result.authorisedFiltered.length === 1 ? "" : "s"} from authorised sellers skipped
+        {result.authorisedFiltered.length > 0 && ` (${[...new Set(result.authorisedFiltered.map((l) => l.seller))].join(", ")})`}
+        {" · "}After AI: {view.hiddenUnrelated} unrelated hidden
+      </p>
+
+      <div className="mt-6 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={clsx(
+              "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium",
+              tab === t.id ? "border-accent text-accent-ink" : "border-transparent text-slate-500 hover:text-slate-800",
+            )}
+          >
+            {t.label}
+            <span className={clsx("ml-1.5 rounded-full px-1.5 text-xs", tab === t.id ? "bg-accent-soft" : "bg-slate-100")}>
+              {view.counts[t.id]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {view.shown.length === 0 ? (
+          <Card className="p-10 text-center">
+            <p className="text-3xl">{view.queue.length + view.unsure.length === 0 ? "🎉" : "🗂️"}</p>
+            <p className="mt-2 font-semibold">
+              {view.queue.length + view.unsure.length === 0 ? "All clear — nothing left to review" : "Nothing in this tab"}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {tab === "unsure"
+                ? "Listings the AI is 30–70% sure about, or that you mark ❓ Unsure, land here."
+                : "Try another tab, or scan another product."}
+            </p>
+          </Card>
+        ) : (
+          view.shown.map((item) => (
+            <ListingCard
+              key={item.listing.id}
+              item={item}
+              product={product}
+              ownerPhoto={ownerPhoto}
+              decision={state.stored.decisions[item.listing.id]}
+              onDecide={(d) => decide(item, d)}
+              onOpenTakedown={() => setPanelFor(item.listing.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {panelItem && (
+        <TakedownPanel
+          item={panelItem}
+          product={product}
+          ownerPhoto={ownerPhoto}
+          cachedText={state.stored.takedowns[panelItem.listing.id]}
+          onText={(text) => {
+            const s = loadScan(id)?.stored ?? state.stored;
+            save({ ...s, takedowns: { ...s.takedowns, [panelItem.listing.id]: text } });
+          }}
+          onClose={() => setPanelFor(null)}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg">
+          {toast.text}
+          {toast.undo && (
+            <button
+              className="font-semibold text-indigo-300 hover:text-indigo-200"
+              onClick={() => {
+                save(toast.undo!);
+                setToast(null);
+              }}
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "red" }) {
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className={clsx("mt-1 text-2xl font-bold tracking-tight", tone === "red" && "text-red-600")}>{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] leading-tight text-slate-400">{hint}</p>}
+    </Card>
+  );
+}
