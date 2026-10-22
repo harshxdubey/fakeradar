@@ -33,6 +33,8 @@ Or push this repo to GitHub and import it at vercel.com/new — zero config. Add
 | `N8N_WEBHOOK_URL` | – | Optional alternative data source; takes priority over `APIFY_TOKEN`. |
 | `ANTHROPIC_API_KEY` | – | Optional. Set it to classify with Claude (compares photos). Empty = **free rule checks**. |
 | `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Model for both Claude calls. |
+| `OPENROUTER_API_KEY` | – | Optional. Reach Claude through OpenRouter instead (used only when `ANTHROPIC_API_KEY` is empty). |
+| `OPENROUTER_MODEL` | `anthropic/claude-sonnet-5.5` | OpenRouter model slug — copy the exact one from openrouter.ai/models. |
 
 ### Free live mode (no paid services)
 

@@ -1,10 +1,13 @@
-// Server-only Anthropic calls. The API key never reaches the browser.
+// Server-only Claude calls, direct to Anthropic or through OpenRouter. Keys never reach the browser.
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Listing, Product, Verdict, VerdictLabel, SellerRisk } from "./types";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+// Check the exact slug at openrouter.ai/models; a wrong one falls back to the free rule checks.
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-5.5";
 
 type ImageBlock = {
   type: "image";
@@ -15,7 +18,7 @@ type ImageBlock = {
 type ContentBlock = ImageBlock | { type: "text"; text: string };
 
 export function hasApiKey() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY);
 }
 
 async function loadPrompt(name: string, vars: Record<string, string | number>) {
@@ -30,7 +33,38 @@ function imageBlock(src: string): ImageBlock | null {
   return null; // e.g. SVG data URLs — Claude can't read those
 }
 
+/** OpenRouter speaks the OpenAI chat format: images become image_url parts. */
+async function callOpenRouter(content: ContentBlock[], maxTokens: number): Promise<string> {
+  const parts = content.map((b) =>
+    b.type === "text"
+      ? { type: "text", text: b.text }
+      : {
+          type: "image_url",
+          image_url: {
+            url: b.source.type === "url" ? b.source.url : `data:${b.source.media_type};base64,${b.source.data}`,
+          },
+        },
+  );
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "x-title": "FakeRadar",
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: parts }],
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  return json.choices?.[0]?.message?.content ?? "";
+}
+
 async function callClaude(content: ContentBlock[], maxTokens: number): Promise<string> {
+  if (!process.env.ANTHROPIC_API_KEY && process.env.OPENROUTER_API_KEY) return callOpenRouter(content, maxTokens);
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
